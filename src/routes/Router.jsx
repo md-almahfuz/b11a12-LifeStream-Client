@@ -265,6 +265,10 @@ const Router = createBrowserRouter([
 
             // },
             {
+                path: "request-details/:id",
+                element: <DonationRequestDetails />,
+            },
+            {
                 path: "content-management",
                 element: <ContentManagement />,
             },

@@ -7,13 +7,10 @@ import { FaPaperPlane, FaTimesCircle } from 'react-icons/fa';
 import axios from 'axios';
 
 const EditDonationRequest = () => {
-    // Access userRole from context
     const { user, userRole, getFirebaseIdToken } = useContext(AuthContext);
-    console.log("User Role in EditDonationRequest:", userRole);
     const navigate = useNavigate();
     const { id } = useParams();
     const { donationRequest, error: loaderError } = useLoaderData();
-    console.log("Donation Request Data:", donationRequest);
 
     const [formData, setFormData] = useState({
         uid: '',
@@ -37,6 +34,26 @@ const EditDonationRequest = () => {
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [isLoadingForm, setIsLoadingForm] = useState(true);
 
+    // Effect to fetch location data
+    useEffect(() => {
+        const loadLocationData = async () => {
+            try {
+                const districtsRes = await fetch('/districts.json');
+                const districtsJson = await districtsRes.json();
+                setDistricts(districtsJson[2].data);
+
+                const upazilasRes = await fetch('/upazilas.json');
+                const upazilasJson = await upazilasRes.json();
+                setAllUpazilas(upazilasJson[2].data);
+            } catch (error) {
+                console.error("Failed to load location data:", error);
+                toast.error("Failed to load location data for form.");
+            }
+        };
+        loadLocationData();
+    }, []);
+
+    // Effect to populate form data and filter upazilas on initial load
     useEffect(() => {
         if (loaderError) {
             toast.error(`Failed to load request for editing: ${loaderError.message}`);
@@ -59,26 +76,9 @@ const EditDonationRequest = () => {
             });
             setIsLoadingForm(false);
         }
-    }, [donationRequest, loaderError, navigate, user]);
+    }, [donationRequest, loaderError, navigate]);
 
-    useEffect(() => {
-        const loadLocationData = async () => {
-            try {
-                const districtsRes = await fetch('/districts.json');
-                const districtsJson = await districtsRes.json();
-                setDistricts(districtsJson[2].data);
-
-                const upazilasRes = await fetch('/upazilas.json');
-                const upazilasJson = await upazilasRes.json();
-                setAllUpazilas(upazilasJson[2].data);
-            } catch (error) {
-                console.error("Failed to load location data:", error);
-                toast.error("Failed to load location data for form.");
-            }
-        };
-        loadLocationData();
-    }, []);
-
+    // A separate effect to filter upazilas based on the district and available data
     useEffect(() => {
         if (formData.recipientDistrict && allUpazilas.length > 0 && districts.length > 0) {
             const selectedDistrictId = districts.find(d => d.name === formData.recipientDistrict)?.id;
@@ -91,10 +91,13 @@ const EditDonationRequest = () => {
         } else {
             setFilteredUpazilas([]);
         }
+        // This line is now removed as it was part of the original issue
+        // We only clear the upazila if the district changes
         if (donationRequest && formData.recipientDistrict !== donationRequest.recipientDistrict) {
             setFormData(prev => ({ ...prev, recipientUpazila: '' }));
         }
-    }, [formData.recipientDistrict, districts, allUpazilas, donationRequest]);
+    }, [formData.recipientDistrict, districts, allUpazilas]);
+
 
     const handleChange = (e) => {
         const { name, value } = e.target;
@@ -120,7 +123,6 @@ const EditDonationRequest = () => {
             return;
         }
 
-        // Authorization check to use userRole string
         const canEdit = userRole === 'admin' || user?.uid === formData.uid;
         if (!user || !canEdit) {
             toast.error("Unauthorized to edit this request.");
@@ -140,13 +142,6 @@ const EditDonationRequest = () => {
                 updatedAt: new Date().toISOString(),
             };
 
-            // Allow admins and volunteers to change status, but volunteers have a limited set of options.
-            // if (userRole === 'volunteer' && updatedRequestData.donationStatus === 'completed') {
-            //     toast.error("Volunteers cannot mark requests as 'completed'.");
-            //     setIsSubmitting(false);
-            //     return;
-            // }
-
             const response = await axiosInstance.put(`/editDonationRequest/${id}`, updatedRequestData, {
                 headers: {
                     'Content-Type': 'application/json',
@@ -156,11 +151,10 @@ const EditDonationRequest = () => {
 
             if (response.status === 200) {
                 toast.success("Donation request updated successfully!");
-                // CHANGE: Redirect based on user's role
                 if (userRole === 'admin' || userRole === 'volunteer') {
                     navigate('/dashboard/all-donation-requests');
                 } else {
-                    navigate('/dashboard/my-donation-requests');
+                    navigate('/dashboard/all-requests');
                 }
             } else {
                 throw new Error(response.data.message || 'Failed to update donation request.');
@@ -187,7 +181,6 @@ const EditDonationRequest = () => {
         );
     }
 
-    // CHANGE: Authorization check for rendering the form
     const canRender = userRole === 'admin' || userRole === 'volunteer' || user?.uid === formData.uid;
     if (!canRender) {
         return (

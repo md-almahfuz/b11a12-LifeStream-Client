@@ -2,8 +2,9 @@ import React, { useState, useEffect, useContext } from 'react';
 import { toast } from 'react-toastify';
 import { AuthContext } from '../provider/AuthProvider'; // Your authentication context
 import axiosInstance from '../api/axiosInstance'; // Your configured Axios instance
-import { FaTint, FaHospital, FaMapMarkerAlt, FaCalendarAlt, FaClock, FaEdit, FaTimesCircle, FaCheckCircle } from 'react-icons/fa'; // Added icons for new buttons
-import { useNavigate } from 'react-router';
+import { FaTint, FaHospital, FaMapMarkerAlt, FaCalendarAlt, FaClock, FaEdit, FaTimesCircle, FaCheckCircle, FaEye } from 'react-icons/fa'; // Added FaEye for the view button
+import { useNavigate } from 'react-router'; // For navigation
+import Swal from 'sweetalert2';
 
 const DonorDashboardHome = () => {
     const { user, getFirebaseIdToken } = useContext(AuthContext);
@@ -62,15 +63,29 @@ const DonorDashboardHome = () => {
         }
     };
 
+    const handleViewRequest = (requestId) => {
+        // Navigate to the detailed view page
+        navigate(`/dashboard/request-details/${requestId}`);
+    };
+
     const handleEditRequest = (requestId) => {
         // Implement navigation to an edit form
-        navigate(`/dashboard/edit-request/${requestId}`);
+        navigate(`/dashboard/edit-donation-request/${requestId}`);
     };
 
     const handleCancelRequest = async (requestId) => {
-        if (window.confirm("Are you sure you want to cancel this donation request? This action cannot be undone.")) {
-            // Implement API call to delete the request on your backend
-            console.log(`Canceling request with ID: ${requestId}`);
+        // Using SweetAlert2 for a more modern confirmation dialog
+        const result = await Swal.fire({
+            title: "Are you sure?",
+            text: "This action cannot be undone!",
+            icon: "warning",
+            showCancelButton: true,
+            confirmButtonColor: "#d33",
+            cancelButtonColor: "#3085d6",
+            confirmButtonText: "Yes, cancel it!"
+        });
+
+        if (result.isConfirmed) {
             try {
                 const idToken = await getFirebaseIdToken();
                 await axiosInstance.delete(`/donationRequests/${requestId}`, {
@@ -89,23 +104,34 @@ const DonorDashboardHome = () => {
     };
 
     const handleCompleteRequest = async (requestId) => {
-        // Implement API call to update the request status to 'completed'
-        console.log(`Completing request with ID: ${requestId}`);
-        try {
-            const idToken = await getFirebaseIdToken();
-            await axiosInstance.put(`/donationRequests/complete/${requestId}`, {}, {
-                headers: {
-                    'Authorization': `Bearer ${idToken}`,
-                },
-            });
-            toast.success('Donation marked as completed!');
-            // Re-fetch requests to update the UI
-            setRecentRequests(prev => prev.map(req =>
-                req._id === requestId ? { ...req, donationStatus: 'completed' } : req
-            ));
-        } catch (error) {
-            console.error('Failed to complete request:', error);
-            toast.error('Failed to mark as completed. Please try again.');
+        // Using SweetAlert2 for a more modern confirmation dialog
+        const result = await Swal.fire({
+            title: "Mark as completed?",
+            text: "This will finalize the donation request.",
+            icon: "info",
+            showCancelButton: true,
+            confirmButtonColor: "#28a745",
+            cancelButtonColor: "#d33",
+            confirmButtonText: "Yes, complete it!"
+        });
+
+        if (result.isConfirmed) {
+            try {
+                const idToken = await getFirebaseIdToken();
+                await axiosInstance.put(`/donationRequests/complete/${requestId}`, {}, {
+                    headers: {
+                        'Authorization': `Bearer ${idToken}`,
+                    },
+                });
+                toast.success('Donation marked as completed!');
+                // Re-fetch requests to update the UI
+                setRecentRequests(prev => prev.map(req =>
+                    req._id === requestId ? { ...req, donationStatus: 'completed' } : req
+                ));
+            } catch (error) {
+                console.error('Failed to complete request:', error);
+                toast.error('Failed to mark as completed. Please try again.');
+            }
         }
     };
 
@@ -169,24 +195,30 @@ const DonorDashboardHome = () => {
                                 </div>
 
                                 {/* Dynamic buttons based on status */}
-                                <div className="mt-4 pt-4 border-t border-gray-100 flex justify-end gap-2">
+                                <div className="mt-4 pt-4 border-t border-gray-100 flex w-full justify-end gap-1">
                                     {request.donationStatus === 'pending' && (
                                         <>
                                             <button
+                                                onClick={() => handleViewRequest(request._id)}
+                                                className="flex-shrink-0 flex items-center bg-gray-500 text-white rounded-md px-2 py-1 text-sm hover:bg-gray-600 transition-colors"
+                                            >
+                                                <FaEye className="mr-1" /> View
+                                            </button>
+                                            <button
                                                 onClick={() => handleEditRequest(request._id)}
-                                                className="flex items-center btn-sm bg-blue-500 text-white rounded-md px-3 py-1 text-sm hover:bg-blue-600 transition-colors"
+                                                className="flex-shrink-0 flex items-center bg-blue-500 text-white rounded-md px-2 py-1 text-sm hover:bg-blue-600 transition-colors"
                                             >
                                                 <FaEdit className="mr-1" /> Edit
                                             </button>
                                             <button
                                                 onClick={() => handleCancelRequest(request._id)}
-                                                className="flex items-center btn-sm bg-red-500 text-white rounded-md px-3 py-1 text-sm hover:bg-red-600 transition-colors"
+                                                className="flex-shrink-0 flex items-center bg-red-500 text-white rounded-md px-2 py-1 text-sm hover:bg-red-600 transition-colors"
                                             >
                                                 <FaTimesCircle className="mr-1" /> Cancel
                                             </button>
                                         </>
                                     )}
-                                    {request.donationStatus === 'InProgress' && (
+                                    {request.donationStatus === 'inProgress' && (
                                         <>
                                             <button
                                                 onClick={() => handleCompleteRequest(request._id)}
