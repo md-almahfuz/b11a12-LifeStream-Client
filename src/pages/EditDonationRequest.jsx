@@ -3,14 +3,17 @@ import { toast } from 'react-toastify';
 import { AuthContext } from '../provider/AuthProvider';
 import axiosInstance from '../api/axiosInstance';
 import { useNavigate, useParams, useLoaderData } from 'react-router';
-import { FaPaperPlane, FaTimesCircle } from 'react-icons/fa'; // Icons for submit and cancel
-import axios from 'axios'; // For axios.isAxiosError
+import { FaPaperPlane, FaTimesCircle } from 'react-icons/fa';
+import axios from 'axios';
 
 const EditDonationRequest = () => {
-    const { user, getFirebaseIdToken } = useContext(AuthContext);
+    // Access userRole from context
+    const { user, userRole, getFirebaseIdToken } = useContext(AuthContext);
+    console.log("User Role in EditDonationRequest:", userRole);
     const navigate = useNavigate();
-    const { id } = useParams(); // Get the request ID from the URL
-    const { donationRequest, error: loaderError } = useLoaderData(); // Get data from loader
+    const { id } = useParams();
+    const { donationRequest, error: loaderError } = useLoaderData();
+    console.log("Donation Request Data:", donationRequest);
 
     const [formData, setFormData] = useState({
         uid: '',
@@ -25,26 +28,24 @@ const EditDonationRequest = () => {
         donationDate: '',
         donationTime: '',
         bloodGroup: '',
-        donationStatus: '', // Load existing status
+        donationStatus: '',
     });
 
     const [districts, setDistricts] = useState([]);
     const [allUpazilas, setAllUpazilas] = useState([]);
     const [filteredUpazilas, setFilteredUpazilas] = useState([]);
     const [isSubmitting, setIsSubmitting] = useState(false);
-    const [isLoadingForm, setIsLoadingForm] = useState(true); // Loading state for form data
+    const [isLoadingForm, setIsLoadingForm] = useState(true);
 
-    // Handle loader errors
     useEffect(() => {
         if (loaderError) {
             toast.error(`Failed to load request for editing: ${loaderError.message}`);
-            navigate('/dashboard/my-donation-requests'); // Redirect if request not found or error
+            navigate('/dashboard');
         } else if (donationRequest) {
-            // Populate form data with fetched request details
             setFormData({
                 uid: donationRequest.uid || '',
-                requesterName: donationRequest.requesterName || user?.displayName || '',
-                requesterEmail: donationRequest.requesterEmail || user?.email || '',
+                requesterName: donationRequest.requesterName || '',
+                requesterEmail: donationRequest.requesterEmail || '',
                 recipientName: donationRequest.recipientName || '',
                 recipientDistrict: donationRequest.recipientDistrict || '',
                 recipientUpazila: donationRequest.recipientUpazila || '',
@@ -58,9 +59,8 @@ const EditDonationRequest = () => {
             });
             setIsLoadingForm(false);
         }
-    }, [donationRequest, loaderError, navigate, user]); // Depend on donationRequest, loaderError, navigate, user
+    }, [donationRequest, loaderError, navigate, user]);
 
-    // Load static location data (districts and all upazilas)
     useEffect(() => {
         const loadLocationData = async () => {
             try {
@@ -79,7 +79,6 @@ const EditDonationRequest = () => {
         loadLocationData();
     }, []);
 
-    // Effect to filter upazilas when recipientDistrict changes
     useEffect(() => {
         if (formData.recipientDistrict && allUpazilas.length > 0 && districts.length > 0) {
             const selectedDistrictId = districts.find(d => d.name === formData.recipientDistrict)?.id;
@@ -92,12 +91,10 @@ const EditDonationRequest = () => {
         } else {
             setFilteredUpazilas([]);
         }
-        // Only reset upazila if the district actually changed and it's not the initial load
         if (donationRequest && formData.recipientDistrict !== donationRequest.recipientDistrict) {
             setFormData(prev => ({ ...prev, recipientUpazila: '' }));
         }
     }, [formData.recipientDistrict, districts, allUpazilas, donationRequest]);
-
 
     const handleChange = (e) => {
         const { name, value } = e.target;
@@ -123,7 +120,9 @@ const EditDonationRequest = () => {
             return;
         }
 
-        if (!user || user.uid !== formData.uid) { // Ensure current user is the requester
+        // Authorization check to use userRole string
+        const canEdit = userRole === 'admin' || user?.uid === formData.uid;
+        if (!user || !canEdit) {
             toast.error("Unauthorized to edit this request.");
             setIsSubmitting(false);
             navigate('/auth/login');
@@ -138,11 +137,17 @@ const EditDonationRequest = () => {
 
             const updatedRequestData = {
                 ...formData,
-                updatedAt: new Date().toISOString(), // Add an update timestamp
+                updatedAt: new Date().toISOString(),
             };
 
-            // Send PUT request to update the specific donation request
-            const response = await axiosInstance.put(`/donationRequests/${id}`, updatedRequestData, {
+            // Allow admins and volunteers to change status, but volunteers have a limited set of options.
+            // if (userRole === 'volunteer' && updatedRequestData.donationStatus === 'completed') {
+            //     toast.error("Volunteers cannot mark requests as 'completed'.");
+            //     setIsSubmitting(false);
+            //     return;
+            // }
+
+            const response = await axiosInstance.put(`/editDonationRequest/${id}`, updatedRequestData, {
                 headers: {
                     'Content-Type': 'application/json',
                     'Authorization': `Bearer ${idToken}`,
@@ -151,7 +156,12 @@ const EditDonationRequest = () => {
 
             if (response.status === 200) {
                 toast.success("Donation request updated successfully!");
-                navigate('/dashboard/my-donation-requests'); // Go back to the list of requests
+                // CHANGE: Redirect based on user's role
+                if (userRole === 'admin' || userRole === 'volunteer') {
+                    navigate('/dashboard/all-donation-requests');
+                } else {
+                    navigate('/dashboard/my-donation-requests');
+                }
             } else {
                 throw new Error(response.data.message || 'Failed to update donation request.');
             }
@@ -177,8 +187,9 @@ const EditDonationRequest = () => {
         );
     }
 
-    // Ensure the user is the one who made the request
-    if (user && user.uid !== formData.uid) {
+    // CHANGE: Authorization check for rendering the form
+    const canRender = userRole === 'admin' || userRole === 'volunteer' || user?.uid === formData.uid;
+    if (!canRender) {
         return (
             <div className="min-h-screen bg-gradient-to-br from-blue-50 to-red-50 flex items-center justify-center p-4 font-sans">
                 <div className="w-full max-w-md bg-white rounded-2xl shadow-2xl p-8 text-center border border-red-300">
@@ -197,20 +208,24 @@ const EditDonationRequest = () => {
         );
     }
 
-
     return (
         <div className="min-h-screen bg-gradient-to-br from-blue-50 to-red-50 flex items-center justify-center p-4 font-sans">
             <div className="w-full max-w-2xl bg-white rounded-2xl shadow-2xl p-8 border border-blue-100">
                 <div className="text-center mb-8">
                     <h1 className="text-4xl font-extrabold text-blue-800 mb-2">Edit Donation Request</h1>
-                    <p className="text-lg text-gray-600">Modify the details of your blood donation request.</p>
+                    {(userRole === 'admin' || userRole === 'volunteer') && donationRequest && (
+                        <p className="text-md text-red-600 font-medium mt-2">
+                            {userRole === 'admin' ? "Admin Mode:" : "Volunteer Mode:"} Editing request for **{donationRequest.requesterName}**
+                        </p>
+                    )}
+                    <p className="text-lg text-gray-600">Modify the details of this blood donation request.</p>
                 </div>
 
                 <form onSubmit={handleSubmit} className="space-y-6">
                     {/* Requester Info (Read-only) */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
-                            <label className="block text-gray-700 text-sm font-semibold mb-2">Your Name</label>
+                            <label className="block text-gray-700 text-sm font-semibold mb-2">Requester Name</label>
                             <input
                                 type="text"
                                 className="input input-bordered w-full bg-gray-100 cursor-not-allowed"
@@ -220,7 +235,7 @@ const EditDonationRequest = () => {
                             />
                         </div>
                         <div>
-                            <label className="block text-gray-700 text-sm font-semibold mb-2">Your Email</label>
+                            <label className="block text-gray-700 text-sm font-semibold mb-2">Requester Email</label>
                             <input
                                 type="email"
                                 className="input input-bordered w-full bg-gray-100 cursor-not-allowed"
@@ -231,9 +246,26 @@ const EditDonationRequest = () => {
                         </div>
                     </div>
 
+                    {/* Admin and Volunteer: Status dropdown */}
+                    {(userRole === 'admin' || userRole === 'volunteer') && (
+                        <div className="pt-4 border-t border-gray-200">
+                            <label htmlFor="donationStatus" className="block text-gray-700 text-sm font-semibold mb-2">Donation Status ({userRole === 'admin' ? 'Admin Only' : 'Volunteer and Admin'})</label>
+                            <select
+                                id="donationStatus"
+                                name="donationStatus"
+                                value={formData.donationStatus}
+                                onChange={handleChange}
+                                className="select select-bordered w-full px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
+                            >
+                                <option value="pending">Pending</option>
+                                <option value="inProgress">In Progress</option>
+                                {/* Only admins can mark as completed */}
+                                {userRole === 'admin' && <option value="completed">Completed</option>}
+                            </select>
+                        </div>
+                    )}
                     <h2 className="text-2xl font-bold text-red-700 pt-4 border-t border-gray-200">Recipient Details</h2>
 
-                    {/* Recipient Name & Blood Group */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
                             <label htmlFor="recipientName" className="block text-gray-700 text-sm font-semibold mb-2">Recipient Name</label>
@@ -271,7 +303,6 @@ const EditDonationRequest = () => {
                         </div>
                     </div>
 
-                    {/* Recipient Location (District, Upazila) */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
                             <label htmlFor="recipientDistrict" className="block text-gray-700 text-sm font-semibold mb-2">Recipient District</label>
@@ -310,8 +341,6 @@ const EditDonationRequest = () => {
                             )}
                         </div>
                     </div>
-
-                    {/* Recipient Street & Hospital Name */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
                             <label htmlFor="recipientStreet" className="block text-gray-700 text-sm font-semibold mb-2">Recipient Street Address</label>
@@ -340,8 +369,6 @@ const EditDonationRequest = () => {
                             />
                         </div>
                     </div>
-
-                    {/* Donation Date & Time */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
                             <label htmlFor="donationDate" className="block text-gray-700 text-sm font-semibold mb-2">Donation Date</label>
@@ -368,8 +395,6 @@ const EditDonationRequest = () => {
                             />
                         </div>
                     </div>
-
-                    {/* Request Message */}
                     <div>
                         <label htmlFor="requestMessage" className="block text-gray-700 text-sm font-semibold mb-2">Request Message (Optional)</label>
                         <textarea
@@ -382,7 +407,6 @@ const EditDonationRequest = () => {
                         ></textarea>
                     </div>
 
-                    {/* Action Buttons */}
                     <div className="flex justify-end gap-3 mt-6">
                         <button
                             type="button"

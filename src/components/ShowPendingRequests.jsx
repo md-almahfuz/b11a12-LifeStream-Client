@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { FaMapMarkerAlt, FaHeart, FaCalendarAlt, FaClock, FaEye } from 'react-icons/fa';
+import { useNavigate } from 'react-router';
 import axiosInstance from '../api/axiosInstance';
 import Loading from '../pages/Loading';
 
@@ -7,6 +8,7 @@ const ShowPendingRequests = () => {
     const [requests, setRequests] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState(null);
+    const navigate = useNavigate(); // Initialize the useNavigate hook
 
     const fetchDonationRequests = async () => {
         setIsLoading(true);
@@ -41,8 +43,13 @@ const ShowPendingRequests = () => {
         );
     }
 
+    // Handler to navigate to the detailed request page
+    const handleViewDetails = (requestId) => {
+        navigate(`/auth/show-request-details/${requestId}`);
+    };
+
     return (
-        <div className="p-4 md:p-8 bg-gray-50 min-h-screen font-sans">
+        <div className="p-4 md:p-8 bg-gray-50 min-h-screen font-sans my-10">
             <div className="max-w-7xl mx-auto">
                 {/* Inspiring Message Section */}
                 <div className="text-center mb-10 p-6 md:p-10 bg-red-600 rounded-2xl shadow-xl text-white">
@@ -94,7 +101,7 @@ const ShowPendingRequests = () => {
                                     </div>
                                 </div>
                                 <button
-                                    onClick={() => console.log(`Viewing details for request ID: ${request._id}`)}
+                                    onClick={() => handleViewDetails(request._id)}
                                     className="mt-6 w-full flex items-center justify-center bg-red-600 text-white font-bold py-3 px-4 rounded-full shadow-md hover:bg-red-700 transition-colors duration-200 transform hover:scale-105"
                                 >
                                     <FaEye className="h-5 w-5 mr-2" /> View Details

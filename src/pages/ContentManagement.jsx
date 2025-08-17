@@ -4,6 +4,7 @@ import { AuthContext } from '../provider/AuthProvider';
 import axiosInstance from '../api/axiosInstance';
 import { useNavigate } from 'react-router';
 import { FaPlus, FaEye, FaEyeSlash, FaTrashAlt, FaSpinner, FaCheckCircle, FaTimesCircle } from 'react-icons/fa'; // Icons for actions and status
+import axios from 'axios';
 
 const ContentManagement = () => { // Component name changed to ContentManagement
     const { user, getFirebaseIdToken } = useContext(AuthContext);
@@ -28,7 +29,7 @@ const ContentManagement = () => { // Component name changed to ContentManagement
 
         try {
             // The axiosInstance interceptor handles attaching the token
-            const response = await axiosInstance.get('/admin/blogs');
+            const response = await axiosInstance.get('/blogs');
             setBlogs(response.data);
         } catch (err) {
             console.error("Error fetching blogs:", err);
@@ -79,7 +80,7 @@ const ContentManagement = () => { // Component name changed to ContentManagement
 
             const idToken = await getFirebaseIdToken();
 
-            await axiosInstance.put(`/admin/blogs/status/${blogId}`, { status: newStatus }, {
+            await axiosInstance.put(`/toggle-blog-status/${blogId}`, { status: newStatus }, {
                 headers: { 'Authorization': `Bearer ${idToken}` }
             });
 

@@ -37,10 +37,13 @@ const AdminDashboard = () => {
                 // Fetch total donations collected (amount)
                 // IMPORTANT: This assumes your backend aggregates a 'donatedAmount' field
                 // from completed donation requests or a separate 'donations' collection.
-                //const donationsResponse = await axiosInstance.get('/admin/stats/donations');
-                //const totalDonationsAmount = donationsResponse.data.totalAmount || 0;
-                const donationsResponse = 300000; // Mocked value for total donations
-                const totalDonationsAmount = donationsResponse || 0;
+                const donationsResponse = await axiosInstance.get('/total-donations');
+                const totalDonationsAmount = donationsResponse.data.totalAmount || 0;
+                console.log("Total donations response:", donationsResponse);
+                //  const donationsResponse = 300000; // Mocked value for total donations
+                //  const totalDonationsAmount = donationsResponse || 0;
+
+                console.log("Total donations amount:", totalDonationsAmount);
 
                 // Fetch total blood donation requests
                 const requestsResponse = await axiosInstance.get('/all-donation-requests-count');

@@ -5,8 +5,9 @@ import { AuthContext } from '../provider/AuthProvider';
 import axiosInstance from '../api/axiosInstance';
 import { useNavigate } from 'react-router';
 import { FaPaperPlane, FaTimesCircle } from 'react-icons/fa'; // Icons for submit and cancel
+import axios from 'axios';
 
-const AddABlog = ({ placeholder = 'Start writing your blog content here...' }) => { // Component name changed to AddABlog
+const AddABlog = ({ placeholder = 'Start writing your blog content here...' }) => {
     const editor = useRef(null);
     const { user, getFirebaseIdToken } = useContext(AuthContext);
     const navigate = useNavigate();
@@ -71,7 +72,7 @@ const AddABlog = ({ placeholder = 'Start writing your blog content here...' }) =
             };
 
             // Send POST request to backend
-            const response = await axiosInstance.post('/admin/blogs', newBlog, {
+            const response = await axiosInstance.post('/post-blog', newBlog, {
                 headers: {
                     'Content-Type': 'application/json',
                     'Authorization': `Bearer ${idToken}`,

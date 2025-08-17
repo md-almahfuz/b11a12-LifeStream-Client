@@ -25,6 +25,8 @@ const DonationRequest = () => {
         donationDate: '',
         donationTime: '',
         bloodGroup: '',
+        //donorName: '', // Optional, can be filled later by donor
+        //donorEmail: '', // Optional, can be filled later by donor
         // donationStatus: 'pending' (default, not shown on form)
     });
 
@@ -181,6 +183,8 @@ const DonationRequest = () => {
             const requestData = {
                 ...formData,
                 donationStatus: 'pending', // Default status
+                donorName: 'No donor yet', // Placeholder, can be updated later
+                donorEmail: 'No donor yet', // Placeholder, can be updated later
                 createdAt: new Date().toISOString(), // Timestamp for the request
             };
 
@@ -193,7 +197,7 @@ const DonationRequest = () => {
 
             if (response.status === 201 || response.status === 200) {
                 toast.success("Donation request submitted successfully!");
-                navigate('/dashboard/my-donation-requests');
+                navigate('/dashboard/all-requests');
             } else {
                 throw new Error(response.data.message || 'Failed to submit donation request.');
             }

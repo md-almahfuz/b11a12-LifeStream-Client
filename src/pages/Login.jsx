@@ -53,7 +53,7 @@ const Login = () => {
         <div className="min-h-screen bg-gradient-to-br from-blue-50 to-red-50 flex items-center justify-center p-4 font-sans">
             <div className="w-full max-w-md bg-white rounded-2xl shadow-2xl p-8 border border-blue-100">
                 <div className="text-center mb-8">
-                    <h1 className="text-4xl font-extrabold text-blue-800 mb-2">Welcome Back!</h1>
+                    <h1 className="text-3xl font-extrabold text-blue-800 mb-2">Welcome To LifeStream</h1>
                     <p className="text-lg text-gray-600">Login to your LifeStream account.</p>
                 </div>
                 <form onSubmit={handleLogin} className="space-y-5">

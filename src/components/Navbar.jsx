@@ -67,7 +67,7 @@ const Navbar = () => {
                             : 'text-gray-700 hover:text-red-600 hover:bg-red-50'
                         }`
                     }
-                    to="/donate"
+                    to="/auth/donate"
                     onClick={closeDropdown}
                 >
                     {/* Updated icon for Donate */}
@@ -82,7 +82,7 @@ const Navbar = () => {
                             : 'text-gray-700 hover:text-blue-600 hover:bg-blue-50'
                         }`
                     }
-                    to="/blog"
+                    to="/blogs"
                     onClick={closeDropdown}
                 >
                     {/* Updated icon for Blog */}

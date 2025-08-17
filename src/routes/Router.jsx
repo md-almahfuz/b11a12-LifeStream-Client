@@ -23,6 +23,10 @@ import UserManagement from '../pages/UserManagement';
 import ContentManagement from '../pages/ContentManagement';
 import AddABlog from '../pages/AddABlog';
 import FindDonor from '../pages/FindDonor';
+import Blogs from '../pages/Blogs';
+import BlogDetail from '../pages/BlogDetail';
+import Donate from '../pages/Donate';
+import DonationRequestDetails from '../pages/DonationRequestDetails';
 
 const Router = createBrowserRouter([
     {
@@ -55,6 +59,22 @@ const Router = createBrowserRouter([
                     </PrivateRoute>
                 ),
             },
+            {
+                path: "/auth/donate",
+                element: (
+                    <PrivateRoute>
+                        <Donate />
+                    </PrivateRoute>
+                ),
+            },
+            {
+                path: "/auth/show-request-details/:id",
+                element: (
+                    <PrivateRoute>
+                        <DonationRequestDetails />
+                    </PrivateRoute>
+                ),
+            }
         ],
     },
 
@@ -71,56 +91,6 @@ const Router = createBrowserRouter([
                 element: <DonationRequest />,
             },
 
-            {
-                // CORRECTED LOADER FOR EDIT DONATION REQUEST
-                path: "edit-donation-request/:id", // Dynamic ID parameter
-                element: <EditDonationRequest />,
-                loader: async ({ params }) => { // Loader receives params
-                    const auth = getAuth();
-                    const user = auth.currentUser;
-
-                    if (!user) {
-                        return redirect('/auth/login');
-                    }
-
-                    const requestId = params.id; // Get the ID from URL params
-                    if (!requestId) {
-                        return { donationRequest: null, error: { message: "Donation Request ID is missing." } };
-                    }
-
-                    try {
-                        // Fetch the specific donation request by ID
-                        // This corresponds to your backend's GET /donationRequests/:id endpoint
-                        const response = await axiosInstance.get(`/donationRequests/${requestId}`, {
-                            headers: {
-                                'Authorization': `Bearer ${await user.getIdToken()}`, // Ensure token is sent
-                            },
-                        });
-
-                        // Important: Also check if the fetched request belongs to the current user
-                        // This is a client-side security check, in addition to the backend's.
-                        if (response.data.uid !== user.uid) {
-                            // Redirect if the logged-in user is not the owner of this request
-                            return redirect('/dashboard/my-donation-requests');
-                        }
-
-                        // Return the single donation request object
-                        return { donationRequest: response.data, error: null };
-                    } catch (error) {
-                        console.error("Loader Error fetching donation request for edit:", error);
-                        const errorMessage = axios.isAxiosError(error) && error.response?.data?.message
-                            ? error.response.data.message
-                            : error.message;
-                        // If 404, specifically return a not found error
-                        if (axios.isAxiosError(error) && error.response?.status === 404) {
-                            return { donationRequest: null, error: { message: "Donation request not found." } };
-                        }
-                        return { donationRequest: null, error: { message: errorMessage } };
-                    }
-                },
-
-                hydrateFallbackElement: <Loading />,
-            },
 
 
             {
@@ -224,6 +194,71 @@ const Router = createBrowserRouter([
                 hydrateFallbackElement: <Loading />, // This is for SSR, generally fine here
             },
 
+            {
+                // CORRECTED LOADER FOR EDIT DONATION REQUEST
+                path: "edit-donation-request/:id", // Dynamic ID parameter
+                element: <EditDonationRequest />,
+                loader: async ({ params }) => { // Loader receives params
+                    const auth = getAuth();
+                    const user = auth.currentUser;
+
+                    if (!user) {
+                        return redirect('/auth/login');
+                    }
+
+                    const requestId = params.id; // Get the ID from URL params
+                    console.log("Fetching donation request for edit with ID:", requestId);
+                    if (!requestId) {
+                        return { donationRequest: null, error: { message: "Donation Request ID is missing." } };
+                    }
+
+                    try {
+                        // Fetch the specific donation request by ID
+                        // This corresponds to your backend's GET /donationRequests/:id endpoint
+
+                        const idToken = await user.getIdToken();
+
+                        // Step 1: Check the current user's role by making an API call
+                        const roleResponse = await axiosInstance.get(`/get-user-role`, {
+                            headers: {
+                                'Authorization': `Bearer ${idToken}`,
+                            },
+                        });
+
+                        const userRole = roleResponse.data.role; // Get the user's role
+
+                        const response = await axiosInstance.get(`/donationRequests/${requestId}`, {
+                            headers: {
+                                'Authorization': `Bearer ${await user.getIdToken()}`, // Ensure token is sent
+                            },
+                        });
+
+                        const isOwner = response.data.uid === user.uid;
+                        const isAdmin = userRole === 'admin';
+
+                        if (!isOwner && !isAdmin) {
+                            return redirect('/dashboard/my-donation-requests');
+                        }
+
+                        // Return the single donation request object
+                        return { donationRequest: response.data, error: null };
+                    } catch (error) {
+                        console.error("Loader Error fetching donation request for edit:", error);
+                        const errorMessage = axios.isAxiosError(error) && error.response?.data?.message
+                            ? error.response.data.message
+                            : error.message;
+                        // If 404, specifically return a not found error
+                        if (axios.isAxiosError(error) && error.response?.status === 404) {
+                            return { donationRequest: null, error: { message: "Donation request not found." } };
+                        }
+                        return { donationRequest: null, error: { message: errorMessage } };
+                    }
+                },
+
+                hydrateFallbackElement: <Loading />,
+            },
+
+
             // {
             //     path: "my-requests",
             //     element: <AllRequests />,
@@ -244,6 +279,14 @@ const Router = createBrowserRouter([
         ],
     },
     {
+        path: "/blogs",
+        element: <Blogs />,
+    },
+    {
+        path: "/blog-details/:id",
+        element: <BlogDetail />,
+    },
+    {
         path: "/aboutus",
         element: <AboutUs />,
     },
@@ -252,6 +295,7 @@ const Router = createBrowserRouter([
         path: "/search-donor",
         element: <FindDonor />,
     },
+
     {
         path: "/*",
         element: <NoRoute></NoRoute>,

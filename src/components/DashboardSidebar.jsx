@@ -77,6 +77,11 @@ export default function DashboardSidebar() {
                     icon={<FaHandHoldingHeart size={20} />} // Using FaHandHoldingHeart for My Requests
                     label="Content Management"
                 />
+                <NavItem
+                    to="/dashboard/profile"
+                    icon={<FaUser size={20} />} // Added icon
+                    label="Profile"
+                />
 
             </nav>
         );
@@ -96,7 +101,7 @@ export default function DashboardSidebar() {
                 label="Add a Request"
             />
             <NavItem
-                to="/dashboard/my-donation-requests" // This path is static, loader handles user.uid
+                to="/dashboard/all-requests" // This path is static, loader handles user.uid
                 icon={<FaList size={20} />} // Added icon
                 label="My Requests"
             />

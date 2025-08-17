@@ -39,6 +39,7 @@ const ShowDonationRequests = () => {
     };
 
     const handleEditClick = (requestId) => {
+        console.log("Editing request with ID:", requestId);
         navigate(`/dashboard/edit-donation-request/${requestId}`);
     };
 
@@ -60,7 +61,7 @@ const ShowDonationRequests = () => {
         <div className="min-h-screen bg-gradient-to-br from-blue-50 to-red-50 p-6 font-sans">
             <div className="max-w-6xl mx-auto bg-white rounded-2xl shadow-2xl p-8 border border-blue-100">
                 <div className="text-center mb-8">
-                    <h1 className="text-4xl font-extrabold text-blue-800 mb-2">My Donation History</h1>
+                    <h1 className="text-4xl font-extrabold text-blue-800 mb-2">Donation History</h1>
                     <p className="text-lg text-gray-600">A record of your invaluable contributions.</p>
                 </div>
 
@@ -76,7 +77,7 @@ const ShowDonationRequests = () => {
                     >
                         <option value="all">All</option>
                         <option value="pending">Pending</option>
-                        <option value="in progress">In Progress</option>
+                        <option value="in progress">InProgress</option>
                         <option value="completed">Completed</option> {/* Changed 'done' to 'completed' for consistency with backend */}
                         <option value="canceled">Canceled</option>
                     </select>

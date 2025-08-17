@@ -54,14 +54,49 @@ const UserManagement = () => { // Component name changed from ShowUsers to UserM
         return u.status === filterStatus;
     });
 
-    // Handle status toggle (Block/Unblock)
+    // // Handle status toggle (Block/Unblock)
+    // const handleToggleStatus = async (userId, currentStatus) => {
+    //     setUpdatingUserId(userId); // Set ID to disable buttons for this row
+    //     try {
+    //         const newStatus = currentStatus === 'active' ? 'blocked' : 'active';
+    //         const idToken = await getFirebaseIdToken();
+
+    //         await axiosInstance.put(`/toggle-user-status/${userId}`, { status: newStatus }, {
+    //             headers: { 'Authorization': `Bearer ${idToken}` }
+    //         });
+
+    //         // Update local state immediately after successful backend update
+    //         setUsers(prevUsers => prevUsers.map(u =>
+    //             u._id === userId ? { ...u, status: newStatus } : u
+    //         ));
+    //         toast.success(`User status updated to '${newStatus}'.`);
+    //     } catch (err) {
+    //         console.error("Error updating user status:", err);
+    //         if (axios.isAxiosError(err) && err.response && err.response.data && err.response.data.message) {
+    //             toast.error(`Failed to update status: ${err.response.data.message}`);
+    //         } else {
+    //             toast.error(`Failed to update status: ${err.message}`);
+    //         }
+    //     } finally {
+    //         setUpdatingUserId(null); // Re-enable buttons
+    //     }
+    // };
+
+    // Function to handle toggling a user's status
     const handleToggleStatus = async (userId, currentStatus) => {
+        console.log("Toggling status for user ID:", userId);
         setUpdatingUserId(userId); // Set ID to disable buttons for this row
+
         try {
-            const newStatus = currentStatus === 'active' ? 'blocked' : 'active';
             const idToken = await getFirebaseIdToken();
 
-            await axiosInstance.put(`/admin/users/status/${userId}`, { status: newStatus }, {
+            // Determine the new status
+            const newStatus = currentStatus === 'active' ? 'blocked' : 'active';
+
+            // IMPORTANT: The backend API expects a JSON body with a 'newStatus' key
+            await axiosInstance.put(`/toggle-user-status/${userId}`, {
+                newStatus: newStatus // Corrected key from 'status' to 'newStatus'
+            }, {
                 headers: { 'Authorization': `Bearer ${idToken}` }
             });
 
@@ -71,30 +106,39 @@ const UserManagement = () => { // Component name changed from ShowUsers to UserM
             ));
             toast.success(`User status updated to '${newStatus}'.`);
         } catch (err) {
-            console.error("Error updating user status:", err);
+            console.error("Error toggling user status:", err);
             if (axios.isAxiosError(err) && err.response && err.response.data && err.response.data.message) {
-                toast.error(`Failed to update status: ${err.response.data.message}`);
+                toast.error(`Failed to toggle status: ${err.response.data.message}`);
             } else {
-                toast.error(`Failed to update status: ${err.message}`);
+                toast.error(`Failed to toggle status: ${err.message}`);
             }
         } finally {
             setUpdatingUserId(null); // Re-enable buttons
         }
     };
 
+
+
     // Handle role change
     const handleChangeRole = async (userId, newRole) => {
+        console.log("Changing role for user ID:", userId, "to new role:", newRole);
         setUpdatingUserId(userId); // Set ID to disable buttons for this row
         try {
             const idToken = await getFirebaseIdToken();
 
-            await axiosInstance.put(`/admin/users/role/${userId}`, { role: newRole }, {
+            // The backend requires both `role` and `status`
+            const newStatus = 'active'; // You can get this from a form field if you want more control
+
+            await axiosInstance.put(`/set-user-role/${userId}`, {
+                role: newRole,
+                status: newStatus // Add the status here
+            }, {
                 headers: { 'Authorization': `Bearer ${idToken}` }
             });
 
             // Update local state immediately after successful backend update
             setUsers(prevUsers => prevUsers.map(u =>
-                u._id === userId ? { ...u, role: newRole } : u
+                u._id === userId ? { ...u, role: newRole, status: newStatus } : u
             ));
             toast.success(`User role updated to '${newRole}'.`);
         } catch (err) {
@@ -108,6 +152,7 @@ const UserManagement = () => { // Component name changed from ShowUsers to UserM
             setUpdatingUserId(null); // Re-enable buttons
         }
     };
+
 
     return (
         <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-50 p-6 font-sans">
@@ -190,8 +235,7 @@ const UserManagement = () => { // Component name changed from ShowUsers to UserM
                                             >
                                                 <option value="donor">Donor</option>
                                                 <option value="volunteer">Volunteer</option>
-                                                {/* Admin role should ideally not be changeable via this UI */}
-                                                {/* <option value="admin">Admin</option> */}
+                                                <option value="admin">Admin</option>
                                             </select>
                                         </td>
                                     </tr>

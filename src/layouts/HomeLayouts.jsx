@@ -20,7 +20,7 @@ const HomeLayouts = () => {
                 </nav>
 
             </header>
-            <main className="w-11/12 grid grid-cols-12 mx-auto my-3 gap-5 ">
+            <main className="w-11/12 grid grid-cols-12 mx-auto my-20 gap-5 ">
                 <section className="main col-span-12 py-5">
                     {state == "loading" ? <Loading /> : <Outlet></Outlet>}
                 </section>
