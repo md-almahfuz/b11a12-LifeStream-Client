@@ -1,6 +1,6 @@
 import React from 'react';
 import { createBrowserRouter, redirect } from 'react-router';
-import { getAuth, onAuthStateChanged } from 'firebase/auth'; // Import onAuthStateChanged
+import { getAuth, onAuthStateChanged } from 'firebase/auth';
 import axios from 'axios';
 
 import HomeLayouts from '../layouts/HomeLayouts';
@@ -32,16 +32,12 @@ import DonationRequestDetails from '../pages/DonationRequestDetails';
 const getAuthReady = () => {
     const auth = getAuth();
     return new Promise(resolve => {
-        // onAuthStateChanged is the most reliable way to know auth status.
-        // It's called once immediately and then on every state change.
         const unsubscribe = onAuthStateChanged(auth, user => {
-            // Once the user is received (or null), we know auth state is ready.
-            unsubscribe(); // Clean up the listener
+            unsubscribe();
             resolve(user);
         });
     });
 };
-
 
 const Router = createBrowserRouter([
     {
@@ -92,7 +88,6 @@ const Router = createBrowserRouter([
             }
         ],
     },
-
     {
         path: "/dashboard",
         element: <DashboardLayout />,
@@ -103,25 +98,27 @@ const Router = createBrowserRouter([
             },
             {
                 path: "create-donation-request",
-                element: <DonationRequest />,
+                element: (
+                    <PrivateRoute requiredRole="donor">
+                        <DonationRequest />
+                    </PrivateRoute>
+                ),
             },
             {
                 path: "all-users",
-                element: <UserManagement />,
+                element: (
+                    // Use the PrivateRoute with requiredRole for admin-only pages
+                    <PrivateRoute requiredRole="admin">
+                        <UserManagement />
+                    </PrivateRoute>
+                ),
                 loader: async () => {
-                    // Wait for the auth state to be ready before proceeding
                     const user = await getAuthReady();
-
-                    if (!user) {
-                        return redirect('/auth/login');
-                    }
-
+                    if (!user) return redirect('/auth/login');
                     try {
-                        console.log("Fetching all user:", user.uid);
                         const response = await axiosInstance.get(`/all-users`);
                         return { myDonations: response.data, error: null };
                     } catch (error) {
-                        console.error("Loader Error fetching users:", error);
                         const errorMessage = axios.isAxiosError(error) && error.response?.data?.message
                             ? error.response.data.message
                             : error.message;
@@ -134,19 +131,12 @@ const Router = createBrowserRouter([
                 path: "all-requests",
                 element: <ShowDonationRequests />,
                 loader: async () => {
-                    // Wait for the auth state to be ready before proceeding
                     const user = await getAuthReady();
-
-                    if (!user) {
-                        return redirect('/auth/login');
-                    }
-
+                    if (!user) return redirect('/auth/login');
                     try {
-                        console.log("Fetching all donation requests for user:", user.uid);
                         const response = await axiosInstance.get(`/my-donation-requests/${user.uid}`);
                         return { myDonations: response.data, error: null };
                     } catch (error) {
-                        console.error("Loader Error fetching my donations:", error);
                         const errorMessage = axios.isAxiosError(error) && error.response?.data?.message
                             ? error.response.data.message
                             : error.message;
@@ -159,19 +149,12 @@ const Router = createBrowserRouter([
                 path: "all-donation-requests",
                 element: <ShowDonationRequests />,
                 loader: async () => {
-                    // Wait for the auth state to be ready before proceeding
                     const user = await getAuthReady();
-
-                    if (!user) {
-                        return redirect('/auth/login');
-                    }
-
+                    if (!user) return redirect('/auth/login');
                     try {
-                        console.log("Fetching all donation requests for all user:");
                         const response = await axiosInstance.get(`/all-donation-requests`);
                         return { myDonations: response.data, error: null };
                     } catch (error) {
-                        console.error("Loader Error fetching my donations:", error);
                         const errorMessage = axios.isAxiosError(error) && error.response?.data?.message
                             ? error.response.data.message
                             : error.message;
@@ -184,51 +167,24 @@ const Router = createBrowserRouter([
                 path: "edit-donation-request/:id",
                 element: <EditDonationRequest />,
                 loader: async ({ params }) => {
-                    // Wait for the auth state to be ready before proceeding
                     const user = await getAuthReady();
-
-                    if (!user) {
-                        return redirect('/auth/login');
-                    }
-
+                    if (!user) return redirect('/auth/login');
                     const requestId = params.id;
-                    console.log("Fetching donation request for edit with ID:", requestId);
-                    if (!requestId) {
-                        return { donationRequest: null, error: { message: "Donation Request ID is missing." } };
-                    }
-
+                    if (!requestId) return { donationRequest: null, error: { message: "Donation Request ID is missing." } };
                     try {
                         const idToken = await user.getIdToken();
-                        const roleResponse = await axiosInstance.get(`/get-user-role`, {
-                            headers: {
-                                'Authorization': `Bearer ${idToken}`,
-                            },
-                        });
-
+                        const roleResponse = await axiosInstance.get(`/get-user-role`, { headers: { 'Authorization': `Bearer ${idToken}` } });
                         const userRole = roleResponse.data.role;
-
-                        const response = await axiosInstance.get(`/donationRequests/${requestId}`, {
-                            headers: {
-                                'Authorization': `Bearer ${await user.getIdToken()}`,
-                            },
-                        });
-
+                        const response = await axiosInstance.get(`/donationRequests/${requestId}`, { headers: { 'Authorization': `Bearer ${await user.getIdToken()}` } });
                         const isOwner = response.data.uid === user.uid;
                         const isAdmin = userRole === 'admin';
-
-                        if (!isOwner && !isAdmin) {
-                            return redirect('/dashboard/my-donation-requests');
-                        }
-
+                        if (!isOwner && !isAdmin) return redirect('/dashboard/my-donation-requests');
                         return { donationRequest: response.data, error: null };
                     } catch (error) {
-                        console.error("Loader Error fetching donation request for edit:", error);
                         const errorMessage = axios.isAxiosError(error) && error.response?.data?.message
                             ? error.response.data.message
                             : error.message;
-                        if (axios.isAxiosError(error) && error.response?.status === 404) {
-                            return { donationRequest: null, error: { message: "Donation request not found." } };
-                        }
+                        if (axios.isAxiosError(error) && error.response?.status === 404) return { donationRequest: null, error: { message: "Donation request not found." } };
                         return { donationRequest: null, error: { message: errorMessage } };
                     }
                 },
@@ -240,11 +196,19 @@ const Router = createBrowserRouter([
             },
             {
                 path: "content-management",
-                element: <ContentManagement />,
+                element: (
+                    <PrivateRoute requiredRole="admin">
+                        <ContentManagement />
+                    </PrivateRoute>
+                ),
             },
             {
                 path: "content-management/add-blog",
-                element: <AddABlog />,
+                element: (
+                    <PrivateRoute requiredRole="admin">
+                        <AddABlog />
+                    </PrivateRoute>
+                ),
             },
             {
                 path: "profile",

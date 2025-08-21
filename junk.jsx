@@ -4206,5 +4206,531 @@ const Router = createBrowserRouter([
 export default Router;
 
 
+import React from 'react';
+import { createBrowserRouter, redirect } from 'react-router';
+import { getAuth, onAuthStateChanged } from 'firebase/auth'; // Import onAuthStateChanged
+import axios from 'axios';
+
+import HomeLayouts from '../layouts/HomeLayouts';
+import HomePageContent from '../pages/HomePage/HomePageContent';
+import AuthLayout from '../layouts/AuthLayout';
+import UserProfile from '../pages/UserProfile';
+import Register from '../pages/Register';
+import Login from '../pages/Login';
+import PrivateRoute from '../provider/PrivateRoute';
+import DashboardLayout from '../layouts/DashboardLayout';
+import Dashboard from '../pages/Dashboard';
+import DonationRequest from '../pages/DonationRequest';
+import ShowDonationRequests from '../pages/ShowDonationRequests';
+import axiosInstance from '../api/axiosInstance';
+import Loading from '../pages/Loading';
+import AboutUs from '../pages/AboutUs';
+import NoRoute from '../pages/NoRoute';
+import EditDonationRequest from '../pages/EditDonationRequest';
+import UserManagement from '../pages/UserManagement';
+import ContentManagement from '../pages/ContentManagement';
+import AddABlog from '../pages/AddABlog';
+import FindDonor from '../pages/FindDonor';
+import Blogs from '../pages/Blogs';
+import BlogDetail from '../pages/BlogDetail';
+import Donate from '../pages/Donate';
+import DonationRequestDetails from '../pages/DonationRequestDetails';
+
+// New helper function to wait for Firebase auth to be ready
+const getAuthReady = () => {
+    const auth = getAuth();
+    return new Promise(resolve => {
+        // onAuthStateChanged is the most reliable way to know auth status.
+        // It's called once immediately and then on every state change.
+        const unsubscribe = onAuthStateChanged(auth, user => {
+            // Once the user is received (or null), we know auth state is ready.
+            unsubscribe(); // Clean up the listener
+            resolve(user);
+        });
+    });
+};
+
+
+const Router = createBrowserRouter([
+    {
+        path: "/",
+        element: <HomeLayouts />,
+        children: [
+            {
+                path: "",
+                element: <HomePageContent />,
+            },
+        ],
+    },
+    {
+        path: "/auth",
+        element: <AuthLayout />,
+        children: [
+            {
+                path: "/auth/login",
+                element: <Login />,
+            },
+            {
+                path: "/auth/register",
+                element: <Register />,
+            },
+            {
+                path: "/auth/user-profile",
+                element: (
+                    <PrivateRoute>
+                        <UserProfile />
+                    </PrivateRoute>
+                ),
+            },
+            {
+                path: "/auth/donate",
+                element: (
+                    <PrivateRoute>
+                        <Donate />
+                    </PrivateRoute>
+                ),
+            },
+            {
+                path: "/auth/show-request-details/:id",
+                element: (
+                    <PrivateRoute>
+                        <DonationRequestDetails />
+                    </PrivateRoute>
+                ),
+            }
+        ],
+    },
+
+    {
+        path: "/dashboard",
+        element: <DashboardLayout />,
+        children: [
+            {
+                index: true,
+                element: <Dashboard />,
+            },
+            {
+                path: "create-donation-request",
+                element: <DonationRequest />,
+            },
+            {
+                path: "all-users",
+                element: <UserManagement />,
+                loader: async () => {
+                    // Wait for the auth state to be ready before proceeding
+                    const user = await getAuthReady();
+
+                    if (!user) {
+                        return redirect('/auth/login');
+                    }
+
+                    try {
+                        console.log("Fetching all user:", user.uid);
+                        const response = await axiosInstance.get(`/all-users`);
+                        return { myDonations: response.data, error: null };
+                    } catch (error) {
+                        console.error("Loader Error fetching users:", error);
+                        const errorMessage = axios.isAxiosError(error) && error.response?.data?.message
+                            ? error.response.data.message
+                            : error.message;
+                        return { myDonations: [], error: { message: errorMessage } };
+                    }
+                },
+                hydrateFallbackElement: <Loading />,
+            },
+            {
+                path: "all-requests",
+                element: <ShowDonationRequests />,
+                loader: async () => {
+                    // Wait for the auth state to be ready before proceeding
+                    const user = await getAuthReady();
+
+                    if (!user) {
+                        return redirect('/auth/login');
+                    }
+
+                    try {
+                        console.log("Fetching all donation requests for user:", user.uid);
+                        const response = await axiosInstance.get(`/my-donation-requests/${user.uid}`);
+                        return { myDonations: response.data, error: null };
+                    } catch (error) {
+                        console.error("Loader Error fetching my donations:", error);
+                        const errorMessage = axios.isAxiosError(error) && error.response?.data?.message
+                            ? error.response.data.message
+                            : error.message;
+                        return { myDonations: [], error: { message: errorMessage } };
+                    }
+                },
+                hydrateFallbackElement: <Loading />,
+            },
+            {
+                path: "all-donation-requests",
+                element: <ShowDonationRequests />,
+                loader: async () => {
+                    // Wait for the auth state to be ready before proceeding
+                    const user = await getAuthReady();
+
+                    if (!user) {
+                        return redirect('/auth/login');
+                    }
+
+                    try {
+                        console.log("Fetching all donation requests for all user:");
+                        const response = await axiosInstance.get(`/all-donation-requests`);
+                        return { myDonations: response.data, error: null };
+                    } catch (error) {
+                        console.error("Loader Error fetching my donations:", error);
+                        const errorMessage = axios.isAxiosError(error) && error.response?.data?.message
+                            ? error.response.data.message
+                            : error.message;
+                        return { myDonations: [], error: { message: errorMessage } };
+                    }
+                },
+                hydrateFallbackElement: <Loading />,
+            },
+            {
+                path: "edit-donation-request/:id",
+                element: <EditDonationRequest />,
+                loader: async ({ params }) => {
+                    // Wait for the auth state to be ready before proceeding
+                    const user = await getAuthReady();
+
+                    if (!user) {
+                        return redirect('/auth/login');
+                    }
+
+                    const requestId = params.id;
+                    console.log("Fetching donation request for edit with ID:", requestId);
+                    if (!requestId) {
+                        return { donationRequest: null, error: { message: "Donation Request ID is missing." } };
+                    }
+
+                    try {
+                        const idToken = await user.getIdToken();
+                        const roleResponse = await axiosInstance.get(`/get-user-role`, {
+                            headers: {
+                                'Authorization': `Bearer ${idToken}`,
+                            },
+                        });
+
+                        const userRole = roleResponse.data.role;
+
+                        const response = await axiosInstance.get(`/donationRequests/${requestId}`, {
+                            headers: {
+                                'Authorization': `Bearer ${await user.getIdToken()}`,
+                            },
+                        });
+
+                        const isOwner = response.data.uid === user.uid;
+                        const isAdmin = userRole === 'admin';
+
+                        if (!isOwner && !isAdmin) {
+                            return redirect('/dashboard/my-donation-requests');
+                        }
+
+                        return { donationRequest: response.data, error: null };
+                    } catch (error) {
+                        console.error("Loader Error fetching donation request for edit:", error);
+                        const errorMessage = axios.isAxiosError(error) && error.response?.data?.message
+                            ? error.response.data.message
+                            : error.message;
+                        if (axios.isAxiosError(error) && error.response?.status === 404) {
+                            return { donationRequest: null, error: { message: "Donation request not found." } };
+                        }
+                        return { donationRequest: null, error: { message: errorMessage } };
+                    }
+                },
+                hydrateFallbackElement: <Loading />,
+            },
+            {
+                path: "request-details/:id",
+                element: <DonationRequestDetails />,
+            },
+            {
+                path: "content-management",
+                element: <ContentManagement />,
+            },
+            {
+                path: "content-management/add-blog",
+                element: <AddABlog />,
+            },
+            {
+                path: "profile",
+                element: <UserProfile />,
+            },
+        ],
+    },
+    {
+        path: "/blogs",
+        element: <Blogs />,
+    },
+    {
+        path: "/blog-details/:id",
+        element: <BlogDetail />,
+    },
+    {
+        path: "/aboutus",
+        element: <AboutUs />,
+    },
+    {
+        path: "/search-donor",
+        element: <FindDonor />,
+    },
+    {
+        path: "/*",
+        element: <NoRoute></NoRoute>,
+    },
+]);
+
+export default Router;
+
+import { NavLink } from "react-router";
+import useRole from "../hooks/useRole";
+import { useContext } from "react";
+import { AuthContext } from "../provider/AuthProvider";
+// Assuming you have icons like FaHome, FaUser, etc., if not, you'll need to import them or use text
+import { FaHome, FaUser, FaPlusCircle, FaList, FaBookOpen, FaHandHoldingHeart } from 'react-icons/fa';
+
+
+export default function DashboardSidebar() {
+    const NavItem = ({ to, icon, label }) => (
+        <NavLink
+            to={to}
+            className={({ isActive }) =>
+                `flex items-center gap-3 px-4 py-2 rounded-lg font-medium ${isActive
+                    ? "bg-blue-100 text-blue-600"
+                    : "text-gray-700 hover:bg-gray-200"
+                }`
+            }
+        >
+            {icon} {label}
+        </NavLink>
+    );
+
+    const { role, loading } = useRole();
+    const { user, getFirebaseIdToken } = useContext(AuthContext);
+
+
+    if (loading) return <h1>Loading...</h1>;
+
+    if (role === "admin")
+        return (
+            <nav className="flex flex-col gap-4">
+                <NavItem
+                    to="/dashboard"
+                    icon={<FaHome size={20} />}
+                    label="Admin Dashboard Home"
+                />
+                <NavItem
+                    to="/dashboard/all-users"
+                    icon={<FaList size={20} />} // Changed to FaList for All Users
+                    label="All Users"
+                />
+                <NavItem
+                    to="/dashboard/all-donation-requests"
+                    icon={<FaBookOpen size={20} />} // Changed to FaBookOpen for My Books
+                    label="All Donation Requests"
+                />
+                {/* FIX: Corrected the path for My Requests */}
+                <NavItem
+                    to="/dashboard/content-management" // This path is static, loader handles user.uid
+                    icon={<FaHandHoldingHeart size={20} />} // Using FaHandHoldingHeart for My Requests
+                    label="Content Management"
+                />
+                <NavItem
+                    to="/dashboard/profile"
+                    icon={<FaUser size={20} />}
+                    label="Profile"
+                />
+
+            </nav>
+        );
+    if (role === "volunteer")
+        return (
+            <nav className="flex flex-col gap-4">
+                <NavItem
+                    to="/dashboard"
+                    icon={<FaHome size={20} />} // Added icon
+                    label="Volunteer Dashboard Home"
+                />
+                <NavItem
+                    to="/dashboard/all-donation-requests"
+                    icon={<FaBookOpen size={20} />} // Changed to FaBookOpen for My Books
+                    label="All Donation Requests"
+                />
+                <NavItem
+                    to="/dashboard/content-management" // This path is static, loader handles user.uid
+                    icon={<FaHandHoldingHeart size={20} />} // Using FaHandHoldingHeart for My Requests
+                    label="Content Management"
+                />
+                <NavItem
+                    to="/dashboard/profile"
+                    icon={<FaUser size={20} />} // Added icon
+                    label="Profile"
+                />
+
+            </nav>
+        );
+
+    // donor sidebar
+    return (
+        <nav className="flex flex-col gap-4">
+            <NavItem
+                to="/dashboard"
+                icon={<FaHome size={20} />} // Added icon
+                label="Donor Dashboard"
+            />
+
+            <NavItem
+                to="/dashboard/create-donation-request"
+                icon={<FaPlusCircle size={20} />} // Added icon
+                label="Add a Request"
+            />
+            <NavItem
+                to="/dashboard/all-requests" // This path is static, loader handles user.uid
+                icon={<FaList size={20} />} // Added icon
+                label="My Requests"
+            />
+            <NavItem
+                to="/dashboard/profile"
+                icon={<FaUser size={20} />} // Added icon
+                label="Profile"
+            />
+
+        </nav>
+    );
+}
+
+
+// src/provider/AuthProvider.js
+
+import React, { createContext, useEffect, useState } from 'react';
+import {
+    getAuth,
+    createUserWithEmailAndPassword,
+    signInWithEmailAndPassword,
+    onAuthStateChanged,
+    signOut,
+    updateProfile,
+    GoogleAuthProvider,
+    signInWithPopup
+} from 'firebase/auth';
+import app from '../firebase/firebase.config';
+import axiosInstance from '../api/axiosInstance';
+
+const auth = getAuth(app);
+const googleProvider = new GoogleAuthProvider();
+
+export const AuthContext = createContext(null);
+
+const AuthProvider = ({ children }) => {
+    const [user, setUser] = useState(null);
+    const [loading, setLoading] = useState(true);
+    // CHANGE: Replaced isAdmin with a more flexible userRole state
+    const [userRole, setUserRole] = useState('donor'); // Default role is 'donor'
+
+    console.log("AuthProvider initialized with userRole:", userRole);
+
+    // Function to get Firebase ID token
+    const getFirebaseIdToken = async (refresh = false) => {
+        if (auth.currentUser) {
+            return auth.currentUser.getIdToken(refresh);
+        }
+        return null;
+    };
+
+    // NEW: Function to check a user's role from the backend
+    const checkUserRole = async (uid, idToken) => {
+        try {
+            // Assuming your backend has an endpoint like /users/role/:uid that returns { role: 'admin' } or { role: 'volunteer' }
+            // const response = await axiosInstance.get(`/get-user-role/${uid}`, {
+            const response = await axiosInstance.get(`/get-user-role`, {
+                headers: {
+                    'Authorization': `Bearer ${idToken}`,
+                },
+            });
+            setUserRole(response.data.role); // Set role to 'admin', 'volunteer', or 'user'
+        } catch (error) {
+            console.error("Failed to check user role:", error);
+            setUserRole('user'); // Default to 'user' on error or network failure
+        }
+    };
+
+    const createUser = (email, password) => {
+        setLoading(true);
+        return createUserWithEmailAndPassword(auth, email, password);
+    };
+
+    const signIn = (email, password) => {
+        setLoading(true);
+        return signInWithEmailAndPassword(auth, email, password);
+    };
+
+    const signInWithGoogle = () => {
+        setLoading(true);
+        return signInWithPopup(auth, googleProvider);
+    };
+
+    const logOut = () => {
+        setLoading(true);
+        // CHANGE: Reset userRole on logout
+        setUserRole('user');
+        return signOut(auth);
+    };
+
+    const updateUserProfile = (profileUpdates) => {
+        console.log("Updating Firebase user profile with:", profileUpdates);
+        return updateProfile(auth.currentUser, profileUpdates);
+    };
+
+    // Firebase Auth State Observer
+    useEffect(() => {
+        const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+            if (currentUser) {
+                try {
+                    const idToken = await currentUser.getIdToken();
+                    setUser({ ...currentUser, accessToken: idToken });
+                    // Check user role after a user is authenticated
+                    await checkUserRole(currentUser.uid, idToken);
+                } catch (error) {
+                    console.error("Error getting Firebase ID token or checking user role:", error);
+                    setUser(currentUser);
+                    setUserRole('user');
+                }
+            } else {
+                setUser(null);
+                // CHANGE: Reset userRole on logout
+                setUserRole('user');
+            }
+            setLoading(false);
+        });
+
+        return () => unsubscribe();
+    }, []);
+
+    const authInfo = {
+        user,
+        loading,
+        // CHANGE: Expose userRole instead of isAdmin
+        userRole,
+        createUser,
+        signIn,
+        signInWithGoogle,
+        logOut,
+        updateUserProfile,
+        getFirebaseIdToken,
+    };
+
+    return (
+        <AuthContext.Provider value={authInfo}>
+            {children}
+        </AuthContext.Provider>
+    );
+};
+
+export default AuthProvider;
+
+
+
 
 

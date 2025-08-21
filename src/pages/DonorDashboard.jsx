@@ -2,33 +2,39 @@ import React, { useState, useEffect, useContext } from 'react';
 import { toast } from 'react-toastify';
 import { AuthContext } from '../provider/AuthProvider'; // Your authentication context
 import axiosInstance from '../api/axiosInstance'; // Your configured Axios instance
-import { FaTint, FaHospital, FaMapMarkerAlt, FaCalendarAlt, FaClock, FaEdit, FaTimesCircle, FaCheckCircle, FaEye } from 'react-icons/fa'; // Added FaEye for the view button
-import { useNavigate } from 'react-router'; // For navigation
+import { FaTint, FaHospital, FaMapMarkerAlt, FaCalendarAlt, FaClock, FaEdit, FaTimesCircle, FaCheckCircle, FaEye } from 'react-icons/fa';
+import { useNavigate } from 'react-router';
 import Swal from 'sweetalert2';
 
 const DonorDashboardHome = () => {
-    const { user, getFirebaseIdToken } = useContext(AuthContext);
+    // Correctly get 'user' and 'loading' states from AuthContext
+    const { user, loading } = useContext(AuthContext);
     const navigate = useNavigate();
     const [recentRequests, setRecentRequests] = useState([]);
-    const [loadingRequests, setLoadingRequests] = useState(true);
+    const [requestsLoading, setRequestsLoading] = useState(true);
     const [errorFetchingRequests, setErrorFetchingRequests] = useState(false);
 
     useEffect(() => {
         const fetchRecentDonationRequests = async () => {
-            if (!user || !user.uid) {
-                setLoadingRequests(false);
+            // Wait for user and loading state to be ready
+            if (!user || loading) {
+                // If loading, just return. The effect will re-run when loading is false.
+                // If no user, we don't need to fetch requests.
+                setRequestsLoading(false);
                 return;
             }
 
-            setLoadingRequests(true);
+            setRequestsLoading(true);
             setErrorFetchingRequests(false);
 
             try {
-                const idToken = await getFirebaseIdToken();
+                // Get the ID token directly from the user object
+                const idToken = await user.getIdToken();
                 if (!idToken) {
                     throw new Error("Authentication token not available. Please log in again.");
                 }
 
+                // Corrected API endpoint to match your backend route
                 const response = await axiosInstance.get(`/donationRequests/recent/${user.uid}`, {
                     headers: {
                         'Authorization': `Bearer ${idToken}`,
@@ -41,12 +47,12 @@ const DonorDashboardHome = () => {
                 toast.error("Failed to load recent donation requests.");
                 setErrorFetchingRequests(true);
             } finally {
-                setLoadingRequests(false);
+                setRequestsLoading(false);
             }
         };
 
         fetchRecentDonationRequests();
-    }, [user, getFirebaseIdToken]);
+    }, [user, loading]); // Added loading to dependency array
 
     const formatDateTime = (date, time) => {
         if (!date || !time) return 'N/A';
@@ -64,17 +70,14 @@ const DonorDashboardHome = () => {
     };
 
     const handleViewRequest = (requestId) => {
-        // Navigate to the detailed view page
         navigate(`/dashboard/request-details/${requestId}`);
     };
 
     const handleEditRequest = (requestId) => {
-        // Implement navigation to an edit form
         navigate(`/dashboard/edit-donation-request/${requestId}`);
     };
 
     const handleCancelRequest = async (requestId) => {
-        // Using SweetAlert2 for a more modern confirmation dialog
         const result = await Swal.fire({
             title: "Are you sure?",
             text: "This action cannot be undone!",
@@ -87,14 +90,13 @@ const DonorDashboardHome = () => {
 
         if (result.isConfirmed) {
             try {
-                const idToken = await getFirebaseIdToken();
+                const idToken = await user.getIdToken();
                 await axiosInstance.delete(`/donationRequests/${requestId}`, {
                     headers: {
                         'Authorization': `Bearer ${idToken}`,
                     },
                 });
                 toast.success('Donation request canceled successfully!');
-                // Re-fetch requests to update the UI
                 setRecentRequests(prev => prev.filter(req => req._id !== requestId));
             } catch (error) {
                 console.error('Failed to cancel request:', error);
@@ -104,7 +106,6 @@ const DonorDashboardHome = () => {
     };
 
     const handleCompleteRequest = async (requestId) => {
-        // Using SweetAlert2 for a more modern confirmation dialog
         const result = await Swal.fire({
             title: "Mark as completed?",
             text: "This will finalize the donation request.",
@@ -117,14 +118,13 @@ const DonorDashboardHome = () => {
 
         if (result.isConfirmed) {
             try {
-                const idToken = await getFirebaseIdToken();
+                const idToken = await user.getIdToken();
                 await axiosInstance.put(`/donationRequests/complete/${requestId}`, {}, {
                     headers: {
                         'Authorization': `Bearer ${idToken}`,
                     },
                 });
                 toast.success('Donation marked as completed!');
-                // Re-fetch requests to update the UI
                 setRecentRequests(prev => prev.map(req =>
                     req._id === requestId ? { ...req, donationStatus: 'completed' } : req
                 ));
@@ -134,6 +134,14 @@ const DonorDashboardHome = () => {
             }
         }
     };
+
+    if (requestsLoading) {
+        return (
+            <div className="flex justify-center items-center min-h-screen">
+                <span className="loading loading-spinner loading-lg text-blue-600"></span>
+            </div>
+        );
+    }
 
     return (
         <div className="min-h-screen bg-gradient-to-br from-blue-50 to-red-50 p-6 font-sans">
@@ -151,12 +159,7 @@ const DonorDashboardHome = () => {
                     Your Recent Donation Requests
                 </h2>
 
-                {loadingRequests ? (
-                    <div className="flex justify-center items-center h-40">
-                        <span className="loading loading-spinner loading-lg text-blue-600"></span>
-                        <p className="ml-3 text-lg text-gray-700">Loading your requests...</p>
-                    </div>
-                ) : errorFetchingRequests ? (
+                {errorFetchingRequests ? (
                     <div className="text-center text-red-500 text-lg py-10">
                         <p>Could not load your recent requests. Please try again later.</p>
                     </div>
@@ -194,7 +197,6 @@ const DonorDashboardHome = () => {
                                     )}
                                 </div>
 
-                                {/* Dynamic buttons based on status */}
                                 <div className="mt-4 pt-4 border-t border-gray-100 flex w-full justify-end gap-1">
                                     {request.donationStatus === 'pending' && (
                                         <>

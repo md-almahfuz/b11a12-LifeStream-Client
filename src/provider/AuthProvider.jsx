@@ -1,6 +1,4 @@
-// src/provider/AuthProvider.js
-
-import React, { createContext, useEffect, useState } from 'react';
+import React, { createContext, useState, useEffect } from 'react';
 import {
     getAuth,
     createUserWithEmailAndPassword,
@@ -13,6 +11,8 @@ import {
 } from 'firebase/auth';
 import app from '../firebase/firebase.config';
 import axiosInstance from '../api/axiosInstance';
+import { toast } from 'react-toastify';
+import axios from 'axios';
 
 const auth = getAuth(app);
 const googleProvider = new GoogleAuthProvider();
@@ -20,35 +20,28 @@ const googleProvider = new GoogleAuthProvider();
 export const AuthContext = createContext(null);
 
 const AuthProvider = ({ children }) => {
+    // The user state will now hold the full Firebase User object
     const [user, setUser] = useState(null);
     const [loading, setLoading] = useState(true);
-    // CHANGE: Replaced isAdmin with a more flexible userRole state
-    const [userRole, setUserRole] = useState('donor'); // Default role is 'donor'
 
-    console.log("AuthProvider initialized with userRole:", userRole);
-
-    // Function to get Firebase ID token
-    const getFirebaseIdToken = async (refresh = false) => {
-        if (auth.currentUser) {
-            return auth.currentUser.getIdToken(refresh);
-        }
-        return null;
-    };
-
-    // NEW: Function to check a user's role from the backend
-    const checkUserRole = async (uid, idToken) => {
+    // Function to fetch the user's role with explicit token handling
+    const fetchUserRole = async (idToken) => {
         try {
-            // Assuming your backend has an endpoint like /users/role/:uid that returns { role: 'admin' } or { role: 'volunteer' }
-            // const response = await axiosInstance.get(`/get-user-role/${uid}`, {
-            const response = await axiosInstance.get(`/get-user-role`, {
+            const response = await axiosInstance.get('/get-user-role', {
                 headers: {
-                    'Authorization': `Bearer ${idToken}`,
-                },
+                    'Authorization': `Bearer ${idToken}`
+                }
             });
-            setUserRole(response.data.role); // Set role to 'admin', 'volunteer', or 'user'
+            if (response.data && response.data.role) {
+                return response.data.role;
+            } else {
+                console.error("API response for user role is missing role data.");
+                return null;
+            }
         } catch (error) {
-            console.error("Failed to check user role:", error);
-            setUserRole('user'); // Default to 'user' on error or network failure
+            console.error("Error fetching user role:", error);
+            toast.error("Failed to load user role. Please try logging in again.");
+            return null;
         }
     };
 
@@ -69,13 +62,10 @@ const AuthProvider = ({ children }) => {
 
     const logOut = () => {
         setLoading(true);
-        // CHANGE: Reset userRole on logout
-        setUserRole('user');
         return signOut(auth);
     };
 
     const updateUserProfile = (profileUpdates) => {
-        console.log("Updating Firebase user profile with:", profileUpdates);
         return updateProfile(auth.currentUser, profileUpdates);
     };
 
@@ -84,20 +74,28 @@ const AuthProvider = ({ children }) => {
         const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
             if (currentUser) {
                 try {
+                    // Get the ID token for the role check
                     const idToken = await currentUser.getIdToken();
-                    setUser({ ...currentUser, accessToken: idToken });
-                    // Check user role after a user is authenticated
-                    await checkUserRole(currentUser.uid, idToken);
+                    const userRole = await fetchUserRole(idToken);
+
+                    if (userRole) {
+                        // Store the original Firebase User object and add the role property
+                        currentUser.role = userRole;
+                        setUser(currentUser);
+                    } else {
+                        // Role fetch failed, log out the user
+                        await signOut(auth);
+                        setUser(null);
+                    }
                 } catch (error) {
-                    console.error("Error getting Firebase ID token or checking user role:", error);
-                    setUser(currentUser);
-                    setUserRole('user');
+                    console.error("Error during auth state change:", error);
+                    await signOut(auth);
+                    setUser(null);
                 }
             } else {
                 setUser(null);
-                // CHANGE: Reset userRole on logout
-                setUserRole('user');
             }
+            // Ensure loading is set to false only after all checks are complete
             setLoading(false);
         });
 
@@ -107,14 +105,11 @@ const AuthProvider = ({ children }) => {
     const authInfo = {
         user,
         loading,
-        // CHANGE: Expose userRole instead of isAdmin
-        userRole,
         createUser,
         signIn,
         signInWithGoogle,
         logOut,
         updateUserProfile,
-        getFirebaseIdToken,
     };
 
     return (

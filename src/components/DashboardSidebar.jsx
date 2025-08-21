@@ -1,5 +1,4 @@
 import { NavLink } from "react-router";
-import useRole from "../hooks/useRole";
 import { useContext } from "react";
 import { AuthContext } from "../provider/AuthProvider";
 // Assuming you have icons like FaHome, FaUser, etc., if not, you'll need to import them or use text
@@ -21,11 +20,15 @@ export default function DashboardSidebar() {
         </NavLink>
     );
 
-    const { role, loading } = useRole();
-    const { user, getFirebaseIdToken } = useContext(AuthContext);
+    // This is the correct way to get user data from the central AuthContext
+    const { user, loading } = useContext(AuthContext);
 
+    // This is the crucial check to prevent the TypeError
+    if (loading || !user) {
+        return <h1>Loading...</h1>;
+    }
 
-    if (loading) return <h1>Loading...</h1>;
+    const role = user.role;
 
     if (role === "admin")
         return (
@@ -37,18 +40,17 @@ export default function DashboardSidebar() {
                 />
                 <NavItem
                     to="/dashboard/all-users"
-                    icon={<FaList size={20} />} // Changed to FaList for All Users
+                    icon={<FaList size={20} />}
                     label="All Users"
                 />
                 <NavItem
                     to="/dashboard/all-donation-requests"
-                    icon={<FaBookOpen size={20} />} // Changed to FaBookOpen for My Books
+                    icon={<FaBookOpen size={20} />}
                     label="All Donation Requests"
                 />
-                {/* FIX: Corrected the path for My Requests */}
                 <NavItem
-                    to="/dashboard/content-management" // This path is static, loader handles user.uid
-                    icon={<FaHandHoldingHeart size={20} />} // Using FaHandHoldingHeart for My Requests
+                    to="/dashboard/content-management"
+                    icon={<FaHandHoldingHeart size={20} />}
                     label="Content Management"
                 />
                 <NavItem
@@ -56,33 +58,32 @@ export default function DashboardSidebar() {
                     icon={<FaUser size={20} />}
                     label="Profile"
                 />
-
             </nav>
         );
+
     if (role === "volunteer")
         return (
             <nav className="flex flex-col gap-4">
                 <NavItem
                     to="/dashboard"
-                    icon={<FaHome size={20} />} // Added icon
+                    icon={<FaHome size={20} />}
                     label="Volunteer Dashboard Home"
                 />
                 <NavItem
                     to="/dashboard/all-donation-requests"
-                    icon={<FaBookOpen size={20} />} // Changed to FaBookOpen for My Books
+                    icon={<FaBookOpen size={20} />}
                     label="All Donation Requests"
                 />
                 <NavItem
-                    to="/dashboard/content-management" // This path is static, loader handles user.uid
-                    icon={<FaHandHoldingHeart size={20} />} // Using FaHandHoldingHeart for My Requests
+                    to="/dashboard/content-management"
+                    icon={<FaHandHoldingHeart size={20} />}
                     label="Content Management"
                 />
                 <NavItem
                     to="/dashboard/profile"
-                    icon={<FaUser size={20} />} // Added icon
+                    icon={<FaUser size={20} />}
                     label="Profile"
                 />
-
             </nav>
         );
 
@@ -91,26 +92,24 @@ export default function DashboardSidebar() {
         <nav className="flex flex-col gap-4">
             <NavItem
                 to="/dashboard"
-                icon={<FaHome size={20} />} // Added icon
+                icon={<FaHome size={20} />}
                 label="Donor Dashboard"
             />
-
             <NavItem
                 to="/dashboard/create-donation-request"
-                icon={<FaPlusCircle size={20} />} // Added icon
+                icon={<FaPlusCircle size={20} />}
                 label="Add a Request"
             />
             <NavItem
-                to="/dashboard/all-requests" // This path is static, loader handles user.uid
-                icon={<FaList size={20} />} // Added icon
+                to="/dashboard/all-requests"
+                icon={<FaList size={20} />}
                 label="My Requests"
             />
             <NavItem
                 to="/dashboard/profile"
-                icon={<FaUser size={20} />} // Added icon
+                icon={<FaUser size={20} />}
                 label="Profile"
             />
-
         </nav>
     );
 }
