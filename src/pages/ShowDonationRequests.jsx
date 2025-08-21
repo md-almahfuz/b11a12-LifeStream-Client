@@ -1,7 +1,7 @@
 import React, { useState } from 'react'; // Added useState for filter
 import { toast } from 'react-toastify';
 import { useLoaderData, useNavigate } from 'react-router';
-import { FaTint, FaHospital, FaMapMarkerAlt, FaCalendarAlt, FaClock, FaEdit } from 'react-icons/fa';
+import { FaTint, FaHospital, FaMapMarkerAlt, FaCalendarAlt, FaClock, FaEdit, FaUserCircle, FaEnvelope } from 'react-icons/fa';
 import axios from 'axios';
 
 const ShowDonationRequests = () => {
@@ -54,7 +54,8 @@ const ShowDonationRequests = () => {
         }
         // Map 'done' to 'completed' for filtering if your DB uses 'completed'
         const statusToCheck = filterStatus === 'done' ? 'completed' : filterStatus;
-        return donation.donationStatus === statusToCheck;
+        // The filter value is case-insensitive
+        return donation.donationStatus?.toLowerCase() === statusToCheck.toLowerCase();
     });
 
     return (
@@ -77,8 +78,8 @@ const ShowDonationRequests = () => {
                     >
                         <option value="all">All</option>
                         <option value="pending">Pending</option>
-                        <option value="in progress">InProgress</option>
-                        <option value="completed">Completed</option> {/* Changed 'done' to 'completed' for consistency with backend */}
+                        <option value="InProgress">InProgress</option>
+                        <option value="completed">Completed</option>
                         <option value="canceled">Canceled</option>
                     </select>
                 </div>
@@ -99,11 +100,12 @@ const ShowDonationRequests = () => {
                                     <th className="p-3 text-left">Hospital</th>
                                     <th className="p-3 text-left">Location</th>
                                     <th className="p-3 text-left">Status</th>
+                                    <th className="p-3 text-left">Donor Info</th>
                                     <th className="p-3 text-left rounded-tr-lg">Actions</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                {filteredDonations.map((donation) => ( // Use filteredDonations here
+                                {filteredDonations.map((donation) => (
                                     <tr key={donation._id} className="border-b border-gray-200 hover:bg-gray-50">
                                         <td className="p-3 font-medium text-gray-800">{donation.recipientName || 'N/A'}</td>
                                         <td className="p-3 flex items-center"><FaTint className="text-red-500 mr-2" /><span className="font-bold">{donation.bloodGroup || 'N/A'}</span></td>
@@ -111,8 +113,25 @@ const ShowDonationRequests = () => {
                                         <td className="p-3 flex items-center"><FaHospital className="text-blue-500 mr-2" />{donation.hospitalName || 'N/A'}</td>
                                         <td className="p-3"><div className="flex items-center"><FaMapMarkerAlt className="text-green-500 mr-2" />{donation.recipientStreet || 'N/A'}, {donation.recipientUpazila || 'N/A'}, {donation.recipientDistrict || 'N/A'}</div></td>
                                         <td className="p-3"><span className={`font-semibold ${donation.donationStatus === 'completed' ? 'text-green-600' : 'text-orange-500'}`}>{donation.donationStatus ? (donation.donationStatus.charAt(0).toUpperCase() + donation.donationStatus.slice(1)) : 'N/A'}</span></td>
+
+                                        {/* Column for Donor Info */}
+                                        <td className="p-3 text-gray-700">
+                                            {donation.donationStatus === 'InProgress' && donation.donorName && donation.donorEmail ? (
+                                                <div className="flex flex-col items-start space-y-1">
+                                                    <div className="flex items-center">
+                                                        <FaUserCircle className="text-gray-500 mr-2" />
+                                                        <span>{donation.donorName}</span>
+                                                    </div>
+                                                    <div className="flex items-center">
+                                                        <FaEnvelope className="text-gray-500 mr-2" />
+                                                        <span>{donation.donorEmail}</span>
+                                                    </div>
+                                                </div>
+                                            ) : (
+                                                <span>N/A</span>
+                                            )}
+                                        </td>
                                         <td className="p-3">
-                                            {/* Only show edit for 'pending' requests, for example */}
                                             {donation.donationStatus === 'pending' && (
                                                 <button
                                                     onClick={() => handleEditClick(donation._id)}

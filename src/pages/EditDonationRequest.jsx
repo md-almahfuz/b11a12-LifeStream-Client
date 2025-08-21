@@ -154,7 +154,7 @@ const EditDonationRequest = () => {
                 if (userRole === 'admin' || userRole === 'volunteer') {
                     navigate('/dashboard/all-donation-requests');
                 } else {
-                    navigate('/dashboard/all-requests');
+                    navigate('/dashboard/my-donation-requests');
                 }
             } else {
                 throw new Error(response.data.message || 'Failed to update donation request.');
@@ -169,6 +169,15 @@ const EditDonationRequest = () => {
             }
         } finally {
             setIsSubmitting(false);
+        }
+    };
+
+    // Function to handle the cancel action with role-based navigation
+    const handleCancel = () => {
+        if (userRole === 'admin' || userRole === 'volunteer') {
+            navigate('/dashboard/all-donation-requests');
+        } else {
+            navigate('/dashboard/my-donation-requests');
         }
     };
 
@@ -403,7 +412,7 @@ const EditDonationRequest = () => {
                     <div className="flex justify-end gap-3 mt-6">
                         <button
                             type="button"
-                            onClick={() => navigate('/dashboard/all-requests')}
+                            onClick={handleCancel}
                             className="btn btn-ghost text-gray-600 hover:text-red-600 transition-colors duration-200 flex items-center"
                         >
                             <FaTimesCircle className="mr-2" /> Cancel

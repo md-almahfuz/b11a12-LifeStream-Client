@@ -36,8 +36,8 @@ const AboutUs = () => {
                             </div>
                             <div className="md:w-1/2">
                                 {/* Placeholder image or illustration */}
-                                <div className="h-64 bg-gray-200 rounded-2xl shadow-lg flex items-center justify-center text-gray-500 italic">
-                                    [Image or illustration of people connecting]
+                                <div className="h-30 w-60 bg-gray-200 rounded-2xl shadow-lg flex items-center justify-center text-gray-500 italic">
+                                    <img src="/resources/donateblood.png" alt="" />
                                 </div>
                             </div>
                         </div>

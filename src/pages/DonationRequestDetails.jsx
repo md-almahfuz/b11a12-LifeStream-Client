@@ -64,19 +64,16 @@ const DonationRequestDetails = () => {
     const handleConfirmDonation = async () => {
         setIsConfirming(true);
         try {
-            // Update the donation request status to 'pending' on the backend
-            // You will need to create a PUT endpoint on your backend to handle this.
-            // Example PUT endpoint: /donationRequests/pending/:id
-            await axiosInstance.put(`/donationRequests/pending/${id}`, {
+            // Update the donation request status to 'inProgress' on the backend
+            await axiosInstance.put(`/claimRequest/${id}`, {
                 donorName: donorInfo.name,
                 donorEmail: donorInfo.email,
             });
 
-            toast.success("Donation confirmed! The request status has been updated.");
+            toast.success("Donation confirmed! The request status has been updated to 'In Progress'.");
 
-            // Optionally, refresh the data to show the new status
-            // For example, by calling fetchRequest() again
-            setRequest(prev => ({ ...prev, donationStatus: 'pending' }));
+            // Update the state to reflect the new 'inProgress' status
+            setRequest(prev => ({ ...prev, donationStatus: 'inProgress' }));
 
             handleCloseModal();
         } catch (err) {
@@ -137,7 +134,7 @@ const DonationRequestDetails = () => {
                             </p>
                             <p className="text-gray-700 font-medium">Address: <span className="font-normal">{request.recipientStreet}</span></p>
                             <p className="text-gray-700 font-medium">District: <span className="font-normal">{request.recipientDistrict}, {request.recipientUpazila}</span></p>
-                            <p className="text-gray-700 font-medium flex items-center">
+                            <p className="text-700 font-medium flex items-center">
                                 <FaCalendarAlt className="mr-2" /> Date: <span className="font-normal ml-1">{new Date(request.donationDate).toLocaleDateString()}</span>
                             </p>
                             <p className="text-gray-700 font-medium flex items-center">
@@ -149,7 +146,8 @@ const DonationRequestDetails = () => {
                         <div className="text-center mt-6">
                             <span className={`px-4 py-2 rounded-full font-bold text-white
                                 ${request.donationStatus === 'pending' ? 'bg-yellow-500' :
-                                    request.donationStatus === 'confirmed' ? 'bg-green-500' : 'bg-red-500'}`}>
+                                    request.donationStatus === 'inProgress' ? 'bg-blue-500' :
+                                        request.donationStatus === 'completed' ? 'bg-green-500' : 'bg-red-500'}`}>
                                 Status: {request.donationStatus}
                             </span>
                         </div>
@@ -159,7 +157,7 @@ const DonationRequestDetails = () => {
                             <button
                                 onClick={handleDonateClick}
                                 className="px-8 py-4 bg-red-600 text-white font-bold rounded-lg shadow-lg hover:bg-red-700 transition-colors duration-200 focus:outline-none focus:ring-4 focus:ring-red-300 focus:ring-opacity-50"
-                                disabled={request.donationStatus !== 'open'}
+                                disabled={request && (request.donationStatus === 'inProgress' || request.donationStatus === 'completed')}
                             >
                                 Donate Now
                             </button>
@@ -173,7 +171,7 @@ const DonationRequestDetails = () => {
                 <div className="fixed inset-0 bg-gray-600 bg-opacity-75 flex items-center justify-center p-4 z-50">
                     <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-md">
                         <h3 className="text-xl font-bold text-gray-900 mb-4 text-center">Confirm Your Donation</h3>
-                        <p className="text-gray-700 mb-4">You are about to confirm your donation to this request. The request status will be updated to "pending".</p>
+                        <p className="text-gray-700 mb-4">You are about to confirm your donation to this request. The request status will be updated to "in progress".</p>
 
                         <div className="space-y-2 mb-6">
                             <p className="font-medium text-gray-800">Your Name: <span className="font-normal">{donorInfo.name}</span></p>

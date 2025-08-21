@@ -1,17 +1,21 @@
 import React, { useState, useEffect, useContext } from 'react';
 import { toast } from 'react-toastify';
+import Swal from 'sweetalert2'; // Import SweetAlert2
 import { AuthContext } from '../provider/AuthProvider'; // Your authentication context
 import axiosInstance from '../api/axiosInstance'; // Your configured Axios instance
 import { FaUserCheck, FaUserSlash, FaUserTie, FaUserShield, FaSpinner } from 'react-icons/fa'; // Icons for actions
 import axios from 'axios'; // For axios.isAxiosError
 
-const UserManagement = () => { // Component name changed from ShowUsers to UserManagement
+// Ensure SweetAlert2 styles are included, e.g., in your main CSS file or index.js
+// import 'sweetalert2/dist/sweetalert2.css';
+
+const UserManagement = () => {
     const { user, getFirebaseIdToken } = useContext(AuthContext);
     const [users, setUsers] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
-    const [filterStatus, setFilterStatus] = useState('all'); // 'all', 'active', 'blocked'
-    const [updatingUserId, setUpdatingUserId] = useState(null); // To disable buttons during update
+    const [filterStatus, setFilterStatus] = useState('all');
+    const [updatingUserId, setUpdatingUserId] = useState(null);
 
     // Fetch all users from the backend
     useEffect(() => {
@@ -44,7 +48,7 @@ const UserManagement = () => { // Component name changed from ShowUsers to UserM
         };
 
         fetchUsers();
-    }, [user]); // Re-fetch users if the user context changes
+    }, [user]);
 
     // Filtered users based on selected status
     const filteredUsers = users.filter(u => {
@@ -54,53 +58,21 @@ const UserManagement = () => { // Component name changed from ShowUsers to UserM
         return u.status === filterStatus;
     });
 
-    // // Handle status toggle (Block/Unblock)
-    // const handleToggleStatus = async (userId, currentStatus) => {
-    //     setUpdatingUserId(userId); // Set ID to disable buttons for this row
-    //     try {
-    //         const newStatus = currentStatus === 'active' ? 'blocked' : 'active';
-    //         const idToken = await getFirebaseIdToken();
-
-    //         await axiosInstance.put(`/toggle-user-status/${userId}`, { status: newStatus }, {
-    //             headers: { 'Authorization': `Bearer ${idToken}` }
-    //         });
-
-    //         // Update local state immediately after successful backend update
-    //         setUsers(prevUsers => prevUsers.map(u =>
-    //             u._id === userId ? { ...u, status: newStatus } : u
-    //         ));
-    //         toast.success(`User status updated to '${newStatus}'.`);
-    //     } catch (err) {
-    //         console.error("Error updating user status:", err);
-    //         if (axios.isAxiosError(err) && err.response && err.response.data && err.response.data.message) {
-    //             toast.error(`Failed to update status: ${err.response.data.message}`);
-    //         } else {
-    //             toast.error(`Failed to update status: ${err.message}`);
-    //         }
-    //     } finally {
-    //         setUpdatingUserId(null); // Re-enable buttons
-    //     }
-    // };
-
-    // Function to handle toggling a user's status
+    // Handle status toggle (Block/Unblock)
     const handleToggleStatus = async (userId, currentStatus) => {
         console.log("Toggling status for user ID:", userId);
-        setUpdatingUserId(userId); // Set ID to disable buttons for this row
+        setUpdatingUserId(userId);
 
         try {
             const idToken = await getFirebaseIdToken();
-
-            // Determine the new status
             const newStatus = currentStatus === 'active' ? 'blocked' : 'active';
 
-            // IMPORTANT: The backend API expects a JSON body with a 'newStatus' key
             await axiosInstance.put(`/toggle-user-status/${userId}`, {
-                newStatus: newStatus // Corrected key from 'status' to 'newStatus'
+                newStatus: newStatus
             }, {
                 headers: { 'Authorization': `Bearer ${idToken}` }
             });
 
-            // Update local state immediately after successful backend update
             setUsers(prevUsers => prevUsers.map(u =>
                 u._id === userId ? { ...u, status: newStatus } : u
             ));
@@ -113,30 +85,46 @@ const UserManagement = () => { // Component name changed from ShowUsers to UserM
                 toast.error(`Failed to toggle status: ${err.message}`);
             }
         } finally {
-            setUpdatingUserId(null); // Re-enable buttons
+            setUpdatingUserId(null);
         }
     };
 
-
-
-    // Handle role change
+    // Updated handleChangeRole with SweetAlert confirmation
     const handleChangeRole = async (userId, newRole) => {
         console.log("Changing role for user ID:", userId, "to new role:", newRole);
-        setUpdatingUserId(userId); // Set ID to disable buttons for this row
+
+        // SweetAlert warning only if the new role is 'admin'
+        if (newRole === 'admin') {
+            const result = await Swal.fire({
+                title: 'Are you sure?',
+                text: "You are about to change this user's role to Admin. Please note that Admin users have the highest level of access.",
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#3085d6',
+                cancelButtonColor: '#d33',
+                confirmButtonText: 'Yes, change role!',
+                cancelButtonText: 'Cancel'
+            });
+
+            // If the user cancels, do not proceed with the role change.
+            if (!result.isConfirmed) {
+                // Reset the select input to its previous value to avoid visual discrepancy.
+                return;
+            }
+        }
+
+        setUpdatingUserId(userId);
         try {
             const idToken = await getFirebaseIdToken();
-
-            // The backend requires both `role` and `status`
-            const newStatus = 'active'; // You can get this from a form field if you want more control
+            const newStatus = 'active';
 
             await axiosInstance.put(`/set-user-role/${userId}`, {
                 role: newRole,
-                status: newStatus // Add the status here
+                status: newStatus
             }, {
                 headers: { 'Authorization': `Bearer ${idToken}` }
             });
 
-            // Update local state immediately after successful backend update
             setUsers(prevUsers => prevUsers.map(u =>
                 u._id === userId ? { ...u, role: newRole, status: newStatus } : u
             ));
@@ -149,7 +137,7 @@ const UserManagement = () => { // Component name changed from ShowUsers to UserM
                 toast.error(`Failed to change role: ${err.message}`);
             }
         } finally {
-            setUpdatingUserId(null); // Re-enable buttons
+            setUpdatingUserId(null);
         }
     };
 
@@ -197,7 +185,8 @@ const UserManagement = () => { // Component name changed from ShowUsers to UserM
                             {/* Head */}
                             <thead className="bg-indigo-100 text-indigo-800 uppercase text-sm">
                                 <tr>
-                                    <th className="p-3 text-left rounded-tl-lg">Name</th>
+                                    <th className="p-3 text-left rounded-tl-lg">Avatar</th>
+                                    <th className="p-3 text-left">Name</th>
                                     <th className="p-3 text-left">Email</th>
                                     <th className="p-3 text-left">Role</th>
                                     <th className="p-3 text-left">Status</th>
@@ -207,6 +196,19 @@ const UserManagement = () => { // Component name changed from ShowUsers to UserM
                             <tbody>
                                 {filteredUsers.map((u) => (
                                     <tr key={u._id} className="border-b border-gray-200 hover:bg-gray-50">
+                                        <td className="p-3">
+                                            <div className="flex items-center space-x-3">
+                                                <div className="avatar">
+                                                    <div className="mask mask-squircle w-12 h-12">
+                                                        <img
+                                                            src={u.photoURL || `https://api.dicebear.com/7.x/initials/svg?seed=${u.name || u.email}`}
+                                                            alt={`${u.name || 'User'}'s avatar`}
+                                                            className="rounded-full"
+                                                        />
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </td>
                                         <td className="p-3 font-medium text-gray-800">{u.name || 'N/A'}</td>
                                         <td className="p-3 text-gray-700">{u.email || 'N/A'}</td>
                                         <td className="p-3 text-gray-700">{u.role ? (u.role.charAt(0).toUpperCase() + u.role.slice(1)) : 'N/A'}</td>
@@ -249,4 +251,4 @@ const UserManagement = () => { // Component name changed from ShowUsers to UserM
     );
 };
 
-export default UserManagement; // Export name changed to UserManagement
+export default UserManagement;

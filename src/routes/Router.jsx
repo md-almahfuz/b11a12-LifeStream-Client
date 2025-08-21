@@ -1,7 +1,7 @@
 import React from 'react';
 import { createBrowserRouter, redirect } from 'react-router';
-import { getAuth } from 'firebase/auth'; // Import getAuth for use in loader
-import axios from 'axios'; // Import axios for error checking in loader
+import { getAuth, onAuthStateChanged } from 'firebase/auth'; // Import onAuthStateChanged
+import axios from 'axios';
 
 import HomeLayouts from '../layouts/HomeLayouts';
 import HomePageContent from '../pages/HomePage/HomePageContent';
@@ -27,6 +27,21 @@ import Blogs from '../pages/Blogs';
 import BlogDetail from '../pages/BlogDetail';
 import Donate from '../pages/Donate';
 import DonationRequestDetails from '../pages/DonationRequestDetails';
+
+// New helper function to wait for Firebase auth to be ready
+const getAuthReady = () => {
+    const auth = getAuth();
+    return new Promise(resolve => {
+        // onAuthStateChanged is the most reliable way to know auth status.
+        // It's called once immediately and then on every state change.
+        const unsubscribe = onAuthStateChanged(auth, user => {
+            // Once the user is received (or null), we know auth state is ready.
+            unsubscribe(); // Clean up the listener
+            resolve(user);
+        });
+    });
+};
+
 
 const Router = createBrowserRouter([
     {
@@ -90,29 +105,20 @@ const Router = createBrowserRouter([
                 path: "create-donation-request",
                 element: <DonationRequest />,
             },
-
-
-
             {
                 path: "all-users",
                 element: <UserManagement />,
                 loader: async () => {
-                    const auth = getAuth(); // Get Firebase Auth instance
-                    const user = auth.currentUser; // Get current user
+                    // Wait for the auth state to be ready before proceeding
+                    const user = await getAuthReady();
 
                     if (!user) {
-                        // If no user is logged in, redirect to login page
                         return redirect('/auth/login');
                     }
 
                     try {
-
-                        console.log("Fetching all  user:", user.uid);
-                        // FIX: Use user.uid correctly within the async loader
-                        // axiosInstance's interceptor will automatically attach the ID token.
+                        console.log("Fetching all user:", user.uid);
                         const response = await axiosInstance.get(`/all-users`);
-
-                        // FIX: Return data in the format expected by useLoaderData
                         return { myDonations: response.data, error: null };
                     } catch (error) {
                         console.error("Loader Error fetching users:", error);
@@ -122,33 +128,22 @@ const Router = createBrowserRouter([
                         return { myDonations: [], error: { message: errorMessage } };
                     }
                 },
-                hydrateFallbackElement: <Loading />, // This is for SSR, generally fine here
+                hydrateFallbackElement: <Loading />,
             },
-            // {
-            //     path: "all-requests",
-            //     element: <MyRequests />,
-            // },
             {
-
                 path: "all-requests",
                 element: <ShowDonationRequests />,
                 loader: async () => {
-                    const auth = getAuth(); // Get Firebase Auth instance
-                    const user = auth.currentUser; // Get current user
+                    // Wait for the auth state to be ready before proceeding
+                    const user = await getAuthReady();
 
                     if (!user) {
-                        // If no user is logged in, redirect to login page
                         return redirect('/auth/login');
                     }
 
                     try {
-
                         console.log("Fetching all donation requests for user:", user.uid);
-                        // FIX: Use user.uid correctly within the async loader
-                        // axiosInstance's interceptor will automatically attach the ID token.
                         const response = await axiosInstance.get(`/my-donation-requests/${user.uid}`);
-
-                        // FIX: Return data in the format expected by useLoaderData
                         return { myDonations: response.data, error: null };
                     } catch (error) {
                         console.error("Loader Error fetching my donations:", error);
@@ -158,30 +153,22 @@ const Router = createBrowserRouter([
                         return { myDonations: [], error: { message: errorMessage } };
                     }
                 },
-                hydrateFallbackElement: <Loading />, // This is for SSR, generally fine here
+                hydrateFallbackElement: <Loading />,
             },
-
             {
-
                 path: "all-donation-requests",
                 element: <ShowDonationRequests />,
                 loader: async () => {
-                    const auth = getAuth(); // Get Firebase Auth instance
-                    const user = auth.currentUser; // Get current user
+                    // Wait for the auth state to be ready before proceeding
+                    const user = await getAuthReady();
 
                     if (!user) {
-                        // If no user is logged in, redirect to login page
                         return redirect('/auth/login');
                     }
 
                     try {
-
                         console.log("Fetching all donation requests for all user:");
-                        // FIX: Use user.uid correctly within the async loader
-                        // axiosInstance's interceptor will automatically attach the ID token.
                         const response = await axiosInstance.get(`/all-donation-requests`);
-
-                        // FIX: Return data in the format expected by useLoaderData
                         return { myDonations: response.data, error: null };
                     } catch (error) {
                         console.error("Loader Error fetching my donations:", error);
@@ -191,45 +178,38 @@ const Router = createBrowserRouter([
                         return { myDonations: [], error: { message: errorMessage } };
                     }
                 },
-                hydrateFallbackElement: <Loading />, // This is for SSR, generally fine here
+                hydrateFallbackElement: <Loading />,
             },
-
             {
-                // CORRECTED LOADER FOR EDIT DONATION REQUEST
-                path: "edit-donation-request/:id", // Dynamic ID parameter
+                path: "edit-donation-request/:id",
                 element: <EditDonationRequest />,
-                loader: async ({ params }) => { // Loader receives params
-                    const auth = getAuth();
-                    const user = auth.currentUser;
+                loader: async ({ params }) => {
+                    // Wait for the auth state to be ready before proceeding
+                    const user = await getAuthReady();
 
                     if (!user) {
                         return redirect('/auth/login');
                     }
 
-                    const requestId = params.id; // Get the ID from URL params
+                    const requestId = params.id;
                     console.log("Fetching donation request for edit with ID:", requestId);
                     if (!requestId) {
                         return { donationRequest: null, error: { message: "Donation Request ID is missing." } };
                     }
 
                     try {
-                        // Fetch the specific donation request by ID
-                        // This corresponds to your backend's GET /donationRequests/:id endpoint
-
                         const idToken = await user.getIdToken();
-
-                        // Step 1: Check the current user's role by making an API call
                         const roleResponse = await axiosInstance.get(`/get-user-role`, {
                             headers: {
                                 'Authorization': `Bearer ${idToken}`,
                             },
                         });
 
-                        const userRole = roleResponse.data.role; // Get the user's role
+                        const userRole = roleResponse.data.role;
 
                         const response = await axiosInstance.get(`/donationRequests/${requestId}`, {
                             headers: {
-                                'Authorization': `Bearer ${await user.getIdToken()}`, // Ensure token is sent
+                                'Authorization': `Bearer ${await user.getIdToken()}`,
                             },
                         });
 
@@ -240,30 +220,20 @@ const Router = createBrowserRouter([
                             return redirect('/dashboard/my-donation-requests');
                         }
 
-                        // Return the single donation request object
                         return { donationRequest: response.data, error: null };
                     } catch (error) {
                         console.error("Loader Error fetching donation request for edit:", error);
                         const errorMessage = axios.isAxiosError(error) && error.response?.data?.message
                             ? error.response.data.message
                             : error.message;
-                        // If 404, specifically return a not found error
                         if (axios.isAxiosError(error) && error.response?.status === 404) {
                             return { donationRequest: null, error: { message: "Donation request not found." } };
                         }
                         return { donationRequest: null, error: { message: errorMessage } };
                     }
                 },
-
                 hydrateFallbackElement: <Loading />,
             },
-
-
-            // {
-            //     path: "my-requests",
-            //     element: <AllRequests />,
-
-            // },
             {
                 path: "request-details/:id",
                 element: <DonationRequestDetails />,
@@ -294,12 +264,10 @@ const Router = createBrowserRouter([
         path: "/aboutus",
         element: <AboutUs />,
     },
-
     {
         path: "/search-donor",
         element: <FindDonor />,
     },
-
     {
         path: "/*",
         element: <NoRoute></NoRoute>,

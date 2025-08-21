@@ -3501,5 +3501,710 @@ const EditDonationRequest = () => {
 
 export default EditDonationRequest;
 
+import React, { useState, useEffect, useContext } from 'react';
+import { toast } from 'react-toastify';
+import { AuthContext } from '../provider/AuthProvider'; // Your authentication context
+import axiosInstance from '../api/axiosInstance'; // Your configured Axios instance
+import { FaUserCheck, FaUserSlash, FaUserTie, FaUserShield, FaSpinner } from 'react-icons/fa'; // Icons for actions
+import axios from 'axios'; // For axios.isAxiosError
+
+const UserManagement = () => { // Component name changed from ShowUsers to UserManagement
+    const { user, getFirebaseIdToken } = useContext(AuthContext);
+    const [users, setUsers] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(null);
+    const [filterStatus, setFilterStatus] = useState('all'); // 'all', 'active', 'blocked'
+    const [updatingUserId, setUpdatingUserId] = useState(null); // To disable buttons during update
+
+    // Fetch all users from the backend
+    useEffect(() => {
+        const fetchUsers = async () => {
+            if (!user) {
+                setLoading(false);
+                setError({ message: "User not authenticated." });
+                return;
+            }
+
+            setLoading(true);
+            setError(null);
+
+            try {
+                // The axiosInstance interceptor should handle attaching the token
+                const response = await axiosInstance.get('/allusers');
+                setUsers(response.data);
+            } catch (err) {
+                console.error("Error fetching all users:", err);
+                if (axios.isAxiosError(err) && err.response && err.response.data && err.response.data.message) {
+                    setError({ message: err.response.data.message });
+                    toast.error(`Failed to load users: ${err.response.data.message}`);
+                } else {
+                    setError({ message: "Failed to load users. Please try again." });
+                    toast.error(`Failed to load users: ${err.message}`);
+                }
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        fetchUsers();
+    }, [user]); // Re-fetch users if the user context changes
+
+    // Filtered users based on selected status
+    const filteredUsers = users.filter(u => {
+        if (filterStatus === 'all') {
+            return true;
+        }
+        return u.status === filterStatus;
+    });
+
+    // // Handle status toggle (Block/Unblock)
+    // const handleToggleStatus = async (userId, currentStatus) => {
+    //     setUpdatingUserId(userId); // Set ID to disable buttons for this row
+    //     try {
+    //         const newStatus = currentStatus === 'active' ? 'blocked' : 'active';
+    //         const idToken = await getFirebaseIdToken();
+
+    //         await axiosInstance.put(`/toggle-user-status/${userId}`, { status: newStatus }, {
+    //             headers: { 'Authorization': `Bearer ${idToken}` }
+    //         });
+
+    //         // Update local state immediately after successful backend update
+    //         setUsers(prevUsers => prevUsers.map(u =>
+    //             u._id === userId ? { ...u, status: newStatus } : u
+    //         ));
+    //         toast.success(`User status updated to '${newStatus}'.`);
+    //     } catch (err) {
+    //         console.error("Error updating user status:", err);
+    //         if (axios.isAxiosError(err) && err.response && err.response.data && err.response.data.message) {
+    //             toast.error(`Failed to update status: ${err.response.data.message}`);
+    //         } else {
+    //             toast.error(`Failed to update status: ${err.message}`);
+    //         }
+    //     } finally {
+    //         setUpdatingUserId(null); // Re-enable buttons
+    //     }
+    // };
+
+    // Function to handle toggling a user's status
+    const handleToggleStatus = async (userId, currentStatus) => {
+        console.log("Toggling status for user ID:", userId);
+        setUpdatingUserId(userId); // Set ID to disable buttons for this row
+
+        try {
+            const idToken = await getFirebaseIdToken();
+
+            // Determine the new status
+            const newStatus = currentStatus === 'active' ? 'blocked' : 'active';
+
+            // IMPORTANT: The backend API expects a JSON body with a 'newStatus' key
+            await axiosInstance.put(`/toggle-user-status/${userId}`, {
+                newStatus: newStatus // Corrected key from 'status' to 'newStatus'
+            }, {
+                headers: { 'Authorization': `Bearer ${idToken}` }
+            });
+
+            // Update local state immediately after successful backend update
+            setUsers(prevUsers => prevUsers.map(u =>
+                u._id === userId ? { ...u, status: newStatus } : u
+            ));
+            toast.success(`User status updated to '${newStatus}'.`);
+        } catch (err) {
+            console.error("Error toggling user status:", err);
+            if (axios.isAxiosError(err) && err.response && err.response.data && err.response.data.message) {
+                toast.error(`Failed to toggle status: ${err.response.data.message}`);
+            } else {
+                toast.error(`Failed to toggle status: ${err.message}`);
+            }
+        } finally {
+            setUpdatingUserId(null); // Re-enable buttons
+        }
+    };
+
+
+
+    // Handle role change
+    const handleChangeRole = async (userId, newRole) => {
+        console.log("Changing role for user ID:", userId, "to new role:", newRole);
+        setUpdatingUserId(userId); // Set ID to disable buttons for this row
+        try {
+            const idToken = await getFirebaseIdToken();
+
+            // The backend requires both `role` and `status`
+            const newStatus = 'active'; // You can get this from a form field if you want more control
+
+            await axiosInstance.put(`/set-user-role/${userId}`, {
+                role: newRole,
+                status: newStatus // Add the status here
+            }, {
+                headers: { 'Authorization': `Bearer ${idToken}` }
+            });
+
+            // Update local state immediately after successful backend update
+            setUsers(prevUsers => prevUsers.map(u =>
+                u._id === userId ? { ...u, role: newRole, status: newStatus } : u
+            ));
+            toast.success(`User role updated to '${newRole}'.`);
+        } catch (err) {
+            console.error("Error changing user role:", err);
+            if (axios.isAxiosError(err) && err.response && err.response.data && err.response.data.message) {
+                toast.error(`Failed to change role: ${err.response.data.message}`);
+            } else {
+                toast.error(`Failed to change role: ${err.message}`);
+            }
+        } finally {
+            setUpdatingUserId(null); // Re-enable buttons
+        }
+    };
+
+
+    return (
+        <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-50 p-6 font-sans">
+            <div className="max-w-7xl mx-auto bg-white rounded-2xl shadow-2xl p-8 border border-blue-100">
+                <div className="text-center mb-8">
+                    <h1 className="text-4xl font-extrabold text-indigo-800 mb-2">Manage All Users</h1>
+                    <p className="text-lg text-gray-600">Overview and control of user accounts on LifeStream.</p>
+                </div>
+
+                {/* Filter Dropdown */}
+                <div className="mb-6 flex justify-end items-center">
+                    <label htmlFor="statusFilter" className="block text-gray-700 text-sm font-semibold mr-3">Filter by Status:</label>
+                    <select
+                        id="statusFilter"
+                        name="statusFilter"
+                        value={filterStatus}
+                        onChange={(e) => setFilterStatus(e.target.value)}
+                        className="select select-bordered w-full max-w-xs px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    >
+                        <option value="all">All</option>
+                        <option value="active">Active</option>
+                        <option value="blocked">Blocked</option>
+                    </select>
+                </div>
+
+                {loading ? (
+                    <div className="flex justify-center items-center h-60">
+                        <span className="loading loading-spinner loading-lg text-indigo-600"></span>
+                        <p className="ml-3 text-lg text-gray-700">Loading users...</p>
+                    </div>
+                ) : error ? (
+                    <div className="text-center text-red-500 text-lg py-10">
+                        <p>{error.message}</p>
+                    </div>
+                ) : filteredUsers.length === 0 ? (
+                    <div className="text-center text-gray-600 text-lg py-10">
+                        <p>No users found matching the filter criteria.</p>
+                    </div>
+                ) : (
+                    <div className="overflow-x-auto">
+                        <table className="table w-full border-collapse">
+                            {/* Head */}
+                            <thead className="bg-indigo-100 text-indigo-800 uppercase text-sm">
+                                <tr>
+                                    <th className="p-3 text-left rounded-tl-lg">Name</th>
+                                    <th className="p-3 text-left">Email</th>
+                                    <th className="p-3 text-left">Role</th>
+                                    <th className="p-3 text-left">Status</th>
+                                    <th className="p-3 text-left rounded-tr-lg">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {filteredUsers.map((u) => (
+                                    <tr key={u._id} className="border-b border-gray-200 hover:bg-gray-50">
+                                        <td className="p-3 font-medium text-gray-800">{u.name || 'N/A'}</td>
+                                        <td className="p-3 text-gray-700">{u.email || 'N/A'}</td>
+                                        <td className="p-3 text-gray-700">{u.role ? (u.role.charAt(0).toUpperCase() + u.role.slice(1)) : 'N/A'}</td>
+                                        <td className="p-3">
+                                            <span className={`font-semibold ${u.status === 'active' ? 'text-green-600' : 'text-red-500'}`}>
+                                                {u.status ? (u.status.charAt(0).toUpperCase() + u.status.slice(1)) : 'N/A'}
+                                            </span>
+                                        </td>
+                                        <td className="p-3 space-x-2">
+                                            {/* Block/Unblock Button */}
+                                            <button
+                                                onClick={() => handleToggleStatus(u._id, u.status)}
+                                                className={`btn btn-sm ${u.status === 'active' ? 'bg-red-500 hover:bg-red-600' : 'bg-green-500 hover:bg-green-600'} text-white transition-colors duration-200`}
+                                                disabled={updatingUserId === u._id}
+                                            >
+                                                {updatingUserId === u._id ? <FaSpinner className="animate-spin" /> : (u.status === 'active' ? <FaUserSlash /> : <FaUserCheck />)}
+                                                <span className="ml-1">{u.status === 'active' ? 'Block' : 'Unblock'}</span>
+                                            </button>
+
+                                            {/* Change Role Dropdown */}
+                                            <select
+                                                value={u.role}
+                                                onChange={(e) => handleChangeRole(u._id, e.target.value)}
+                                                className="select select-bordered select-sm text-gray-700"
+                                                disabled={updatingUserId === u._id}
+                                            >
+                                                <option value="donor">Donor</option>
+                                                <option value="volunteer">Volunteer</option>
+                                                <option value="admin">Admin</option>
+                                            </select>
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+};
+
+export default UserManagement; // Export name changed to UserManagement
+
+import React, { useState } from 'react'; // Added useState for filter
+import { toast } from 'react-toastify';
+import { useLoaderData, useNavigate } from 'react-router';
+import { FaTint, FaHospital, FaMapMarkerAlt, FaCalendarAlt, FaClock, FaEdit } from 'react-icons/fa';
+import axios from 'axios';
+
+const ShowDonationRequests = () => {
+    const { myDonations, error } = useLoaderData();
+    const navigate = useNavigate();
+
+    // New state for filter status, default to 'all'
+    const [filterStatus, setFilterStatus] = useState('all');
+
+    if (error) {
+        toast.error(`Error loading donations: ${error.message}`);
+        return (
+            <div className="min-h-screen bg-gradient-to-br from-blue-50 to-red-50 p-6 font-sans flex items-center justify-center">
+                <div className="text-center text-red-500 text-lg py-10">
+                    <p>Could not load your donation history. Please try again later.</p>
+                    <p className="text-sm">Details: {error.message}</p>
+                </div>
+            </div>
+        );
+    }
+
+    const formatDateTime = (date, time) => {
+        if (!date || !time) return 'N/A';
+        try {
+            const dateTimeString = `${date}T${time}:00`;
+            const options = {
+                year: 'numeric', month: 'long', day: 'numeric',
+                hour: '2-digit', minute: '2-digit', hour12: true
+            };
+            return new Date(dateTimeString).toLocaleString(undefined, options);
+        } catch (e) {
+            console.error("Error formatting date/time:", e);
+            return `${date} at ${time}`;
+        }
+    };
+
+    const handleEditClick = (requestId) => {
+        console.log("Editing request with ID:", requestId);
+        navigate(`/dashboard/edit-donation-request/${requestId}`);
+    };
+
+    const handleFilterChange = (e) => {
+        setFilterStatus(e.target.value);
+    };
+
+    // Filter the donations based on the selected status
+    const filteredDonations = myDonations.filter(donation => {
+        if (filterStatus === 'all') {
+            return true; // Show all donations
+        }
+        // Map 'done' to 'completed' for filtering if your DB uses 'completed'
+        const statusToCheck = filterStatus === 'done' ? 'completed' : filterStatus;
+        return donation.donationStatus === statusToCheck;
+    });
+
+    return (
+        <div className="min-h-screen bg-gradient-to-br from-blue-50 to-red-50 p-6 font-sans">
+            <div className="max-w-6xl mx-auto bg-white rounded-2xl shadow-2xl p-8 border border-blue-100">
+                <div className="text-center mb-8">
+                    <h1 className="text-4xl font-extrabold text-blue-800 mb-2">Donation History</h1>
+                    <p className="text-lg text-gray-600">A record of your invaluable contributions.</p>
+                </div>
+
+                {/* Filter Dropdown */}
+                <div className="mb-6 flex justify-end items-center">
+                    <label htmlFor="statusFilter" className="block text-gray-700 text-sm font-semibold mr-3">Filter by Status:</label>
+                    <select
+                        id="statusFilter"
+                        name="statusFilter"
+                        value={filterStatus}
+                        onChange={handleFilterChange}
+                        className="select select-bordered w-full max-w-xs px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                        <option value="all">All</option>
+                        <option value="pending">Pending</option>
+                        <option value="in progress">InProgress</option>
+                        <option value="completed">Completed</option> {/* Changed 'done' to 'completed' for consistency with backend */}
+                        <option value="canceled">Canceled</option>
+                    </select>
+                </div>
+
+                {filteredDonations.length === 0 ? (
+                    <div className="text-center text-gray-600 text-lg py-10">
+                        <p>No donations found with status "{filterStatus}".</p>
+                    </div>
+                ) : (
+                    <div className="overflow-x-auto">
+                        <table className="table w-full border-collapse">
+                            {/* Head */}
+                            <thead className="bg-blue-100 text-blue-800 uppercase text-sm">
+                                <tr>
+                                    <th className="p-3 text-left rounded-tl-lg">Recipient</th>
+                                    <th className="p-3 text-left">Blood Group</th>
+                                    <th className="p-3 text-left">Date & Time</th>
+                                    <th className="p-3 text-left">Hospital</th>
+                                    <th className="p-3 text-left">Location</th>
+                                    <th className="p-3 text-left">Status</th>
+                                    <th className="p-3 text-left rounded-tr-lg">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {filteredDonations.map((donation) => ( // Use filteredDonations here
+                                    <tr key={donation._id} className="border-b border-gray-200 hover:bg-gray-50">
+                                        <td className="p-3 font-medium text-gray-800">{donation.recipientName || 'N/A'}</td>
+                                        <td className="p-3 flex items-center"><FaTint className="text-red-500 mr-2" /><span className="font-bold">{donation.bloodGroup || 'N/A'}</span></td>
+                                        <td className="p-3"><div className="flex items-center"><FaCalendarAlt className="text-purple-500 mr-2" />{formatDateTime(donation.donationDate, donation.donationTime)}</div></td>
+                                        <td className="p-3 flex items-center"><FaHospital className="text-blue-500 mr-2" />{donation.hospitalName || 'N/A'}</td>
+                                        <td className="p-3"><div className="flex items-center"><FaMapMarkerAlt className="text-green-500 mr-2" />{donation.recipientStreet || 'N/A'}, {donation.recipientUpazila || 'N/A'}, {donation.recipientDistrict || 'N/A'}</div></td>
+                                        <td className="p-3"><span className={`font-semibold ${donation.donationStatus === 'completed' ? 'text-green-600' : 'text-orange-500'}`}>{donation.donationStatus ? (donation.donationStatus.charAt(0).toUpperCase() + donation.donationStatus.slice(1)) : 'N/A'}</span></td>
+                                        <td className="p-3">
+                                            {/* Only show edit for 'pending' requests, for example */}
+                                            {donation.donationStatus === 'pending' && (
+                                                <button
+                                                    onClick={() => handleEditClick(donation._id)}
+                                                    className="btn btn-sm btn-info text-white hover:bg-blue-700 transition-colors duration-200"
+                                                    title="Edit Request"
+                                                >
+                                                    <FaEdit className="mr-1" /> Edit
+                                                </button>
+                                            )}
+                                            {/* You might add a 'View Details' button for completed ones */}
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+};
+
+export default ShowDonationRequests;
+
+
+
+import React from 'react';
+import { createBrowserRouter, redirect } from 'react-router';
+import { getAuth } from 'firebase/auth'; // Import getAuth for use in loader
+import axios from 'axios'; // Import axios for error checking in loader
+
+import HomeLayouts from '../layouts/HomeLayouts';
+import HomePageContent from '../pages/HomePage/HomePageContent';
+import AuthLayout from '../layouts/AuthLayout';
+import UserProfile from '../pages/UserProfile';
+import Register from '../pages/Register';
+import Login from '../pages/Login';
+import PrivateRoute from '../provider/PrivateRoute';
+import DashboardLayout from '../layouts/DashboardLayout';
+import Dashboard from '../pages/Dashboard';
+import DonationRequest from '../pages/DonationRequest';
+import ShowDonationRequests from '../pages/ShowDonationRequests';
+import axiosInstance from '../api/axiosInstance';
+import Loading from '../pages/Loading';
+import AboutUs from '../pages/AboutUs';
+import NoRoute from '../pages/NoRoute';
+import EditDonationRequest from '../pages/EditDonationRequest';
+import UserManagement from '../pages/UserManagement';
+import ContentManagement from '../pages/ContentManagement';
+import AddABlog from '../pages/AddABlog';
+import FindDonor from '../pages/FindDonor';
+import Blogs from '../pages/Blogs';
+import BlogDetail from '../pages/BlogDetail';
+import Donate from '../pages/Donate';
+import DonationRequestDetails from '../pages/DonationRequestDetails';
+
+const Router = createBrowserRouter([
+    {
+        path: "/",
+        element: <HomeLayouts />,
+        children: [
+            {
+                path: "",
+                element: <HomePageContent />,
+            },
+        ],
+    },
+    {
+        path: "/auth",
+        element: <AuthLayout />,
+        children: [
+            {
+                path: "/auth/login",
+                element: <Login />,
+            },
+            {
+                path: "/auth/register",
+                element: <Register />,
+            },
+            {
+                path: "/auth/user-profile",
+                element: (
+                    <PrivateRoute>
+                        <UserProfile />
+                    </PrivateRoute>
+                ),
+            },
+            {
+                path: "/auth/donate",
+                element: (
+                    <PrivateRoute>
+                        <Donate />
+                    </PrivateRoute>
+                ),
+            },
+            {
+                path: "/auth/show-request-details/:id",
+                element: (
+                    <PrivateRoute>
+                        <DonationRequestDetails />
+                    </PrivateRoute>
+                ),
+            }
+        ],
+    },
+
+    {
+        path: "/dashboard",
+        element: <DashboardLayout />,
+        children: [
+            {
+                index: true,
+                element: <Dashboard />,
+            },
+            {
+                path: "create-donation-request",
+                element: <DonationRequest />,
+            },
+
+
+
+            {
+                path: "all-users",
+                element: <UserManagement />,
+                loader: async () => {
+                    const auth = getAuth(); // Get Firebase Auth instance
+                    const user = auth.currentUser; // Get current user
+
+                    if (!user) {
+                        // If no user is logged in, redirect to login page
+                        return redirect('/auth/login');
+                    }
+
+                    try {
+
+                        console.log("Fetching all  user:", user.uid);
+                        // FIX: Use user.uid correctly within the async loader
+                        // axiosInstance's interceptor will automatically attach the ID token.
+                        const response = await axiosInstance.get(`/all-users`);
+
+                        // FIX: Return data in the format expected by useLoaderData
+                        return { myDonations: response.data, error: null };
+                    } catch (error) {
+                        console.error("Loader Error fetching users:", error);
+                        const errorMessage = axios.isAxiosError(error) && error.response?.data?.message
+                            ? error.response.data.message
+                            : error.message;
+                        return { myDonations: [], error: { message: errorMessage } };
+                    }
+                },
+                hydrateFallbackElement: <Loading />, // This is for SSR, generally fine here
+            },
+            // {
+            //     path: "all-requests",
+            //     element: <MyRequests />,
+            // },
+            {
+
+                path: "all-requests",
+                element: <ShowDonationRequests />,
+                loader: async () => {
+                    const auth = getAuth(); // Get Firebase Auth instance
+                    const user = auth.currentUser; // Get current user
+
+                    if (!user) {
+                        // If no user is logged in, redirect to login page
+                        return redirect('/auth/login');
+                    }
+
+                    try {
+
+                        console.log("Fetching all donation requests for user:", user.uid);
+                        // FIX: Use user.uid correctly within the async loader
+                        // axiosInstance's interceptor will automatically attach the ID token.
+                        const response = await axiosInstance.get(`/my-donation-requests/${user.uid}`);
+
+                        // FIX: Return data in the format expected by useLoaderData
+                        return { myDonations: response.data, error: null };
+                    } catch (error) {
+                        console.error("Loader Error fetching my donations:", error);
+                        const errorMessage = axios.isAxiosError(error) && error.response?.data?.message
+                            ? error.response.data.message
+                            : error.message;
+                        return { myDonations: [], error: { message: errorMessage } };
+                    }
+                },
+                hydrateFallbackElement: <Loading />, // This is for SSR, generally fine here
+            },
+
+            {
+
+                path: "all-donation-requests",
+                element: <ShowDonationRequests />,
+                loader: async () => {
+                    const auth = getAuth(); // Get Firebase Auth instance
+                    const user = auth.currentUser; // Get current user
+
+                    if (!user) {
+                        // If no user is logged in, redirect to login page
+                        return redirect('/auth/login');
+                    }
+
+                    try {
+
+                        console.log("Fetching all donation requests for all user:");
+                        // FIX: Use user.uid correctly within the async loader
+                        // axiosInstance's interceptor will automatically attach the ID token.
+                        const response = await axiosInstance.get(`/all-donation-requests`);
+
+                        // FIX: Return data in the format expected by useLoaderData
+                        return { myDonations: response.data, error: null };
+                    } catch (error) {
+                        console.error("Loader Error fetching my donations:", error);
+                        const errorMessage = axios.isAxiosError(error) && error.response?.data?.message
+                            ? error.response.data.message
+                            : error.message;
+                        return { myDonations: [], error: { message: errorMessage } };
+                    }
+                },
+                hydrateFallbackElement: <Loading />, // This is for SSR, generally fine here
+            },
+
+            {
+                // CORRECTED LOADER FOR EDIT DONATION REQUEST
+                path: "edit-donation-request/:id", // Dynamic ID parameter
+                element: <EditDonationRequest />,
+                loader: async ({ params }) => { // Loader receives params
+                    const auth = getAuth();
+                    const user = auth.currentUser;
+
+                    if (!user) {
+                        return redirect('/auth/login');
+                    }
+
+                    const requestId = params.id; // Get the ID from URL params
+                    console.log("Fetching donation request for edit with ID:", requestId);
+                    if (!requestId) {
+                        return { donationRequest: null, error: { message: "Donation Request ID is missing." } };
+                    }
+
+                    try {
+                        // Fetch the specific donation request by ID
+                        // This corresponds to your backend's GET /donationRequests/:id endpoint
+
+                        const idToken = await user.getIdToken();
+
+                        // Step 1: Check the current user's role by making an API call
+                        const roleResponse = await axiosInstance.get(`/get-user-role`, {
+                            headers: {
+                                'Authorization': `Bearer ${idToken}`,
+                            },
+                        });
+
+                        const userRole = roleResponse.data.role; // Get the user's role
+
+                        const response = await axiosInstance.get(`/donationRequests/${requestId}`, {
+                            headers: {
+                                'Authorization': `Bearer ${await user.getIdToken()}`, // Ensure token is sent
+                            },
+                        });
+
+                        const isOwner = response.data.uid === user.uid;
+                        const isAdmin = userRole === 'admin';
+
+                        if (!isOwner && !isAdmin) {
+                            return redirect('/dashboard/my-donation-requests');
+                        }
+
+                        // Return the single donation request object
+                        return { donationRequest: response.data, error: null };
+                    } catch (error) {
+                        console.error("Loader Error fetching donation request for edit:", error);
+                        const errorMessage = axios.isAxiosError(error) && error.response?.data?.message
+                            ? error.response.data.message
+                            : error.message;
+                        // If 404, specifically return a not found error
+                        if (axios.isAxiosError(error) && error.response?.status === 404) {
+                            return { donationRequest: null, error: { message: "Donation request not found." } };
+                        }
+                        return { donationRequest: null, error: { message: errorMessage } };
+                    }
+                },
+
+                hydrateFallbackElement: <Loading />,
+            },
+
+
+            // {
+            //     path: "my-requests",
+            //     element: <AllRequests />,
+
+            // },
+            {
+                path: "request-details/:id",
+                element: <DonationRequestDetails />,
+            },
+            {
+                path: "content-management",
+                element: <ContentManagement />,
+            },
+            {
+                path: "content-management/add-blog",
+                element: <AddABlog />,
+            },
+            {
+                path: "profile",
+                element: <UserProfile />,
+            },
+        ],
+    },
+    {
+        path: "/blogs",
+        element: <Blogs />,
+    },
+    {
+        path: "/blog-details/:id",
+        element: <BlogDetail />,
+    },
+    {
+        path: "/aboutus",
+        element: <AboutUs />,
+    },
+
+    {
+        path: "/search-donor",
+        element: <FindDonor />,
+    },
+
+    {
+        path: "/*",
+        element: <NoRoute></NoRoute>,
+    },
+]);
+
+export default Router;
+
+
 
 
