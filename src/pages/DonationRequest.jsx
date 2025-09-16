@@ -47,10 +47,10 @@ const DonationRequest = () => {
         const fetchUserData = async () => {
             if (user && user.uid) {
                 setIsLoadingUserStatus(true);
-                console.log("DonationRequest: Current user object:", user);
-                console.log("DonationRequest: user.displayName:", user.displayName);
-                console.log("DonationRequest: user.email:", user.email);
-                console.log("Loading user data from DB for UID:", user.uid);
+                // console.log("DonationRequest: Current user object:", user);
+                // console.log("DonationRequest: user.displayName:", user.displayName);
+                // console.log("DonationRequest: user.email:", user.email);
+                // console.log("Loading user data from DB for UID:", user.uid);
 
                 try {
                     // Fetch additional user data from your backend
@@ -183,8 +183,8 @@ const DonationRequest = () => {
             const requestData = {
                 ...formData,
                 donationStatus: 'pending', // Default status
-                donorName: 'No donor yet', // Placeholder, can be updated later
-                donorEmail: 'No donor yet', // Placeholder, can be updated later
+                donorName: '', // Placeholder, can be updated later
+                donorEmail: '', // Placeholder, can be updated later
                 createdAt: new Date().toISOString(), // Timestamp for the request
             };
 
@@ -197,7 +197,7 @@ const DonationRequest = () => {
 
             if (response.status === 201 || response.status === 200) {
                 toast.success("Donation request submitted successfully!");
-                navigate('/dashboard/all-requests');
+                navigate('/dashboard/my-donation-requests'); // Redirect to user's requests page
             } else {
                 throw new Error(response.data.message || 'Failed to submit donation request.');
             }

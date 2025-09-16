@@ -44,7 +44,7 @@ export default function DashboardSidebar() {
                     label="All Users"
                 />
                 <NavItem
-                    to="/dashboard/all-donation-requests"
+                    to="/dashboard/all-blood-donation-requests"
                     icon={<FaBookOpen size={20} />}
                     label="All Donation Requests"
                 />
@@ -70,7 +70,7 @@ export default function DashboardSidebar() {
                     label="Volunteer Dashboard Home"
                 />
                 <NavItem
-                    to="/dashboard/all-donation-requests"
+                    to="/dashboard/all-blood-donation-requests"
                     icon={<FaBookOpen size={20} />}
                     label="All Donation Requests"
                 />
@@ -88,28 +88,31 @@ export default function DashboardSidebar() {
         );
 
     // donor sidebar
-    return (
-        <nav className="flex flex-col gap-4">
-            <NavItem
-                to="/dashboard"
-                icon={<FaHome size={20} />}
-                label="Donor Dashboard"
-            />
-            <NavItem
-                to="/dashboard/create-donation-request"
-                icon={<FaPlusCircle size={20} />}
-                label="Add a Request"
-            />
-            <NavItem
-                to="/dashboard/all-requests"
-                icon={<FaList size={20} />}
-                label="My Requests"
-            />
-            <NavItem
-                to="/dashboard/profile"
-                icon={<FaUser size={20} />}
-                label="Profile"
-            />
-        </nav>
-    );
+    if (role === "donor")
+        return (
+            <nav className="flex flex-col gap-4">
+                <NavItem
+                    to="/dashboard"
+                    icon={<FaHome size={20} />}
+                    label="Donor Dashboard"
+                />
+                <NavItem
+                    to="/dashboard/create-donation-request"
+                    icon={<FaPlusCircle size={20} />}
+                    label="Add a Request"
+                />
+                <NavItem
+                    to="/dashboard/my-donation-requests"
+                    icon={<FaList size={20} />}
+                    label="My Requests"
+                />
+                <NavItem
+                    to="/dashboard/profile"
+                    icon={<FaUser size={20} />}
+                    label="Profile"
+                />
+            </nav>
+        );
 }
+
+

@@ -5,6 +5,7 @@ import axiosInstance from '../api/axiosInstance';
 import { useNavigate } from 'react-router';
 import { FaPlus, FaEye, FaEyeSlash, FaTrashAlt, FaSpinner, FaCheckCircle, FaTimesCircle } from 'react-icons/fa'; // Icons for actions and status
 import axios from 'axios';
+import Swal from 'sweetalert2';
 
 const ContentManagement = () => { // Component name changed to ContentManagement
     const { user, getFirebaseIdToken } = useContext(AuthContext);
@@ -103,33 +104,51 @@ const ContentManagement = () => { // Component name changed to ContentManagement
 
     // Handle Delete Blog
     const handleDeleteBlog = async (blogId) => {
-        if (!window.confirm("Are you sure you want to delete this blog? This action cannot be undone.")) {
-            return; // User cancelled
-        }
+        Swal.fire({
+            title: "Are you sure?",
+            text: "You are about to delete this blog. This action cannot be undone!",
+            icon: "warning",
+            showCancelButton: true,
+            confirmButtonColor: "#d33",
+            cancelButtonColor: "#3085d6",
+            confirmButtonText: "Yes, delete it!"
+        }).then(async (result) => {
+            if (result.isConfirmed) {
+                setUpdatingBlogId(blogId); // Set ID to disable buttons for this row
+                try {
+                    const idToken = await getFirebaseIdToken();
 
-        setUpdatingBlogId(blogId); // Set ID to disable buttons for this row
-        try {
-            const idToken = await getFirebaseIdToken();
+                    await axiosInstance.delete(`delete-blog/${blogId}`, {
+                        headers: { 'Authorization': `Bearer ${idToken}` }
+                    });
 
-            await axiosInstance.delete(`/admin/blogs/${blogId}`, {
-                headers: { 'Authorization': `Bearer ${idToken}` }
-            });
+                    // Remove blog from local state immediately after successful backend delete
+                    setBlogs(prevBlogs => prevBlogs.filter(blog => blog._id !== blogId));
+                    toast.success("Blog deleted successfully!");
 
-            // Remove blog from local state immediately after successful backend delete
-            setBlogs(prevBlogs => prevBlogs.filter(blog => blog._id !== blogId));
-            toast.success("Blog deleted successfully!");
-        } catch (err) {
-            console.error("Error deleting blog:", err);
-            if (axios.isAxiosError(err) && err.response && err.response.data && err.response.data.message) {
-                toast.error(`Failed to delete blog: ${err.response.data.message}`);
-            } else {
-                toast.error(`Failed to delete blog: ${err.message}`);
+                    Swal.fire({
+                        title: "Deleted!",
+                        text: "Your blog has been deleted.",
+                        icon: "success"
+                    });
+                } catch (err) {
+                    console.error("Error deleting blog:", err);
+                    if (axios.isAxiosError(err) && err.response && err.response.data && err.response.data.message) {
+                        toast.error(`Failed to delete blog: ${err.response.data.message}`);
+                    } else {
+                        toast.error(`Failed to delete blog: ${err.message}`);
+                    }
+                    Swal.fire({
+                        title: "Error!",
+                        text: "Failed to delete the blog.",
+                        icon: "error"
+                    });
+                } finally {
+                    setUpdatingBlogId(null); // Re-enable buttons
+                }
             }
-        } finally {
-            setUpdatingBlogId(null); // Re-enable buttons
-        }
+        });
     };
-
     const getStatusDisplay = (status) => {
         switch (status) {
             case 'draft': return <span className="text-gray-500 font-semibold flex items-center"><FaEyeSlash className="mr-1" /> Draft</span>;

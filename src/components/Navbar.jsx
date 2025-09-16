@@ -44,21 +44,7 @@ const Navbar = () => {
                     <FaHome className="inline-block mr-2" /> Home
                 </NavLink>
             </li>
-            <li>
-                <NavLink
-                    className={({ isActive }) =>
-                        `text-lg font-semibold px-4 py-2 rounded-lg transition-colors duration-200 ${isActive
-                            ? 'bg-red-600 text-white shadow-md'
-                            : 'text-gray-700 hover:text-red-600 hover:bg-red-50'
-                        }`
-                    }
-                    to="/create-request"
-                    onClick={closeDropdown}
-                >
-                    {/* Updated icon for Create a Request */}
-                    <FaPlusCircle className="inline-block mr-2" /> Create a Request
-                </NavLink>
-            </li>
+
             <li>
                 <NavLink
                     className={({ isActive }) =>

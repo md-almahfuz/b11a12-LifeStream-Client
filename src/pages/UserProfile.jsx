@@ -4,11 +4,13 @@ import { AuthContext } from '../provider/AuthProvider';
 import { FaPaperPlane, FaEdit, FaTimesCircle } from 'react-icons/fa';
 import { useNavigate } from 'react-router';
 import axiosInstance from '../api/axiosInstance'; // axios instance
+import axios from 'axios';
 
 const UserProfile = () => {
     // The SERVER_ADDRESS is typically configured in axiosInstance's baseUrl
     // const SERVER_ADDRESS = import.meta.env.VITE_SERVER_URL || 'http://localhost:3000';
-    const { user, updateUserProfile, getFirebaseIdToken } = useContext(AuthContext);
+    // Removed getFirebaseIdToken from useContext as it is not needed and was the source of the error.
+    const { user, updateUserProfile } = useContext(AuthContext);
     const navigate = useNavigate();
 
     const [formData, setFormData] = useState({
@@ -119,7 +121,8 @@ const UserProfile = () => {
         try {
             await updateUserProfile({ displayName: name, photoURL: photoUrlToUpdate });
 
-            const idToken = await getFirebaseIdToken();
+            // Correctly get the ID token from the user object
+            const idToken = await user.getIdToken();
             console.log("Frontend: idToken obtained:", idToken);
             if (!idToken) {
                 console.error("Frontend: idToken is null or empty. Throwing error.");

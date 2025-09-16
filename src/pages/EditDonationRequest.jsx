@@ -1,425 +1,407 @@
-import React, { useState, useEffect, useContext } from 'react';
-import { toast } from 'react-toastify';
-import { AuthContext } from '../provider/AuthProvider';
-import axiosInstance from '../api/axiosInstance';
-import { useNavigate, useParams, useLoaderData } from 'react-router';
-import { FaPaperPlane, FaTimesCircle } from 'react-icons/fa';
-import axios from 'axios';
+import React, { useState, useEffect, useContext } from "react";
+import { toast } from "react-toastify";
+import { AuthContext } from "../provider/AuthProvider";
+import axiosInstance from "../api/axiosInstance";
+import { useNavigate, useParams, useLoaderData } from "react-router";
+import { FaPaperPlane, FaTimesCircle } from "react-icons/fa";
+import useRole from "../hooks/useRole";
 
 const EditDonationRequest = () => {
-    const { user, userRole, getFirebaseIdToken } = useContext(AuthContext);
+    const { user, getFirebaseIdToken } = useContext(AuthContext);
     const navigate = useNavigate();
     const { id } = useParams();
+    const { role: userRole, loading: isRoleLoading } = useRole();
     const { donationRequest, error: loaderError } = useLoaderData();
 
-    const [formData, setFormData] = useState({
-        uid: '',
-        requesterName: '',
-        requesterEmail: '',
-        recipientName: '',
-        recipientDistrict: '',
-        recipientUpazila: '',
-        recipientStreet: '',
-        hospitalName: '',
-        requestMessage: '',
-        donationDate: '',
-        donationTime: '',
-        bloodGroup: '',
-        donationStatus: '',
-    });
-
+    const [formData, setFormData] = useState({});
     const [districts, setDistricts] = useState([]);
     const [allUpazilas, setAllUpazilas] = useState([]);
     const [filteredUpazilas, setFilteredUpazilas] = useState([]);
+    const [allUsers, setAllUsers] = useState([]);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [isLoadingForm, setIsLoadingForm] = useState(true);
 
-    // Effect to fetch location data
-    useEffect(() => {
-        const loadLocationData = async () => {
-            try {
-                const districtsRes = await fetch('/districts.json');
-                const districtsJson = await districtsRes.json();
-                setDistricts(districtsJson[2].data);
+    const [previousStatus, setPreviousStatus] = useState("");
+    const [showDonorModal, setShowDonorModal] = useState(false);
+    const [selectedDonor, setSelectedDonor] = useState("");
 
-                const upazilasRes = await fetch('/upazilas.json');
+    // Determine permissions
+    const isOwner = user?.uid === donationRequest.uid;
+    const isAdmin = userRole === "admin";
+    const isVolunteer = userRole === "volunteer";
+
+
+    // Load initial data
+    useEffect(() => {
+        const loadInitialData = async () => {
+            try {
+                const [districtsRes, upazilasRes, usersRes] = await Promise.all([
+                    fetch("/districts.json"),
+                    fetch("/upazilas.json"),
+                    axiosInstance.get("/allusers"),
+                ]);
+
+                const districtsJson = await districtsRes.json();
                 const upazilasJson = await upazilasRes.json();
-                setAllUpazilas(upazilasJson[2].data);
-            } catch (error) {
-                console.error("Failed to load location data:", error);
-                toast.error("Failed to load location data for form.");
+
+                setDistricts(districtsJson[2]?.data || []);
+                setAllUpazilas(upazilasJson[2]?.data || []);
+                setAllUsers(usersRes.data || []);
+
+                if (loaderError) {
+                    toast.error(`Failed to load request: ${loaderError.message}`);
+                    navigate("/dashboard");
+                    return;
+                }
+
+                if (donationRequest) {
+                    setFormData({
+                        ...donationRequest,
+                        donationStatus: donationRequest.donationStatus || "pending",
+                    });
+                    setPreviousStatus(donationRequest.donationStatus || "pending");
+
+                    const selectedDistrictId = (districtsJson[2]?.data || []).find(
+                        (d) => d.name === donationRequest.recipientDistrict
+                    )?.id;
+
+                    if (selectedDistrictId) {
+                        setFilteredUpazilas(
+                            (upazilasJson[2]?.data || []).filter(
+                                (u) => u.district_id === selectedDistrictId
+                            )
+                        );
+                    }
+                }
+            } catch (err) {
+                console.error(err);
+                toast.error("Failed to load form data");
+            } finally {
+                setIsLoadingForm(false);
             }
         };
-        loadLocationData();
-    }, []);
-
-    // Effect to populate form data and filter upazilas on initial load
-    useEffect(() => {
-        if (loaderError) {
-            toast.error(`Failed to load request for editing: ${loaderError.message}`);
-            navigate('/dashboard');
-        } else if (donationRequest) {
-            setFormData({
-                uid: donationRequest.uid || '',
-                requesterName: donationRequest.requesterName || '',
-                requesterEmail: donationRequest.requesterEmail || '',
-                recipientName: donationRequest.recipientName || '',
-                recipientDistrict: donationRequest.recipientDistrict || '',
-                recipientUpazila: donationRequest.recipientUpazila || '',
-                recipientStreet: donationRequest.recipientStreet || '',
-                hospitalName: donationRequest.hospitalName || '',
-                requestMessage: donationRequest.requestMessage || '',
-                donationDate: donationRequest.donationDate || '',
-                donationTime: donationRequest.donationTime || '',
-                bloodGroup: donationRequest.bloodGroup || '',
-                donationStatus: donationRequest.donationStatus || 'pending',
-            });
-            setIsLoadingForm(false);
-        }
+        loadInitialData();
     }, [donationRequest, loaderError, navigate]);
-
-    // A separate effect to filter upazilas based on the district and available data
-    useEffect(() => {
-        if (formData.recipientDistrict && allUpazilas.length > 0 && districts.length > 0) {
-            const selectedDistrictId = districts.find(d => d.name === formData.recipientDistrict)?.id;
-            if (selectedDistrictId) {
-                const filtered = allUpazilas.filter(upazila => upazila.district_id === selectedDistrictId);
-                setFilteredUpazilas(filtered);
-            } else {
-                setFilteredUpazilas([]);
-            }
-        } else {
-            setFilteredUpazilas([]);
-        }
-        // This line is now removed as it was part of the original issue
-        // We only clear the upazila if the district changes
-        if (donationRequest && formData.recipientDistrict !== donationRequest.recipientDistrict) {
-            setFormData(prev => ({ ...prev, recipientUpazila: '' }));
-        }
-    }, [formData.recipientDistrict, districts, allUpazilas]);
-
 
     const handleChange = (e) => {
         const { name, value } = e.target;
-        setFormData(prev => ({
-            ...prev,
-            [name]: value
-        }));
+
+        if (
+            name === "donationStatus" &&
+            (isAdmin || isVolunteer || isOwner) &&
+            previousStatus === "pending" &&
+            value === "inProgress"
+        ) {
+            setShowDonorModal(true);
+        }
+
+        setFormData((prev) => ({ ...prev, [name]: value }));
+
+        if (name === "recipientDistrict") {
+            const selectedDistrictId = districts.find((d) => d.name === value)?.id;
+            setFilteredUpazilas(
+                selectedDistrictId
+                    ? allUpazilas.filter((u) => u.district_id === selectedDistrictId)
+                    : []
+            );
+            setFormData((prev) => ({ ...prev, recipientUpazila: "" }));
+        }
     };
+
+    // const handleSubmit = async (e) => {
+    //     e.preventDefault();
+    //     setIsSubmitting(true);
+
+    //     if (
+    //         (isAdmin || isVolunteer || isOwner) &&
+    //         formData.donationStatus === "inProgress" &&
+    //         !selectedDonor
+    //     ) {
+    //         toast.error("Please select a donor before proceeding.");
+    //         setIsSubmitting(false);
+    //         return;
+    //     }
+
+    //     let updatedRequestData = {};
+    //     if (isOwner || isAdmin) {
+    //         updatedRequestData = {
+    //             ...formData,
+    //             donorId: selectedDonor || formData.donorId,
+    //             updatedAt: new Date().toISOString(),
+    //         };
+    //     } else if (isVolunteer) {
+    //         updatedRequestData = {
+    //             donationStatus: formData.donationStatus,
+    //             donorId: selectedDonor || formData.donorId,
+    //             updatedAt: new Date().toISOString(),
+    //         };
+    //     } else {
+    //         toast.error("You are not allowed to update this request.");
+    //         setIsSubmitting(false);
+    //         return;
+    //     }
+
+    //     try {
+    //         const idToken = await getFirebaseIdToken();
+    //         await axiosInstance.put(`/editDonationRequest/${id}`, updatedRequestData, {
+    //             headers: { Authorization: `Bearer ${idToken}` },
+    //         });
+
+    //         toast.success("Donation request updated successfully!");
+    //         navigate(isOwner ? "/dashboard/my-donation-requests" : "/dashboard/all-blood-donation-requests");
+    //     } catch (error) {
+    //         console.error(error);
+    //         toast.error("Update failed.");
+    //     } finally {
+    //         setIsSubmitting(false);
+    //     }
+    // };
 
     const handleSubmit = async (e) => {
         e.preventDefault();
         setIsSubmitting(true);
 
-        const {
-            recipientName, recipientDistrict, recipientUpazila, recipientStreet,
-            hospitalName, donationDate, donationTime, bloodGroup
-        } = formData;
-
-        if (!recipientName || !recipientDistrict || !recipientUpazila || !recipientStreet ||
-            !hospitalName || !donationDate || !donationTime || !bloodGroup) {
-            toast.error("Please fill in all required fields.");
+        if (
+            (isAdmin || isVolunteer || isOwner) &&
+            formData.donationStatus === "inProgress" &&
+            !selectedDonor
+        ) {
+            toast.error("Please select a donor before proceeding.");
             setIsSubmitting(false);
             return;
         }
 
-        const canEdit = userRole === 'admin' || user?.uid === formData.uid;
-        if (!user || !canEdit) {
-            toast.error("Unauthorized to edit this request.");
+        // find donor info
+        let donorInfo = {};
+        if (selectedDonor) {
+            const donorUser = allUsers.find((u) => u._id === selectedDonor);
+
+            if (donorUser) {
+                donorInfo = {
+                    donorName: donorUser.name,
+                    donorEmail: donorUser.email,
+                };
+            }
+            // console.log("Selected Donor User:", donorUser.name, donorUser.email);
+        }
+
+        let updatedRequestData = {};
+        if (isOwner || isAdmin) {
+            updatedRequestData = {
+                ...formData,
+                ...donorInfo,
+                updatedAt: new Date().toISOString(),
+            };
+        } else if (isVolunteer) {
+            updatedRequestData = {
+                donationStatus: formData.donationStatus,
+                ...donorInfo,
+                updatedAt: new Date().toISOString(),
+            };
+        } else {
+            toast.error("You are not allowed to update this request.");
             setIsSubmitting(false);
-            navigate('/auth/login');
             return;
         }
+        console.log("Updated Request Data:", updatedRequestData);
 
         try {
             const idToken = await getFirebaseIdToken();
-            if (!idToken) {
-                throw new Error("Authentication token not available. Please log in again.");
-            }
-
-            const updatedRequestData = {
-                ...formData,
-                updatedAt: new Date().toISOString(),
-            };
-
-            const response = await axiosInstance.put(`/editDonationRequest/${id}`, updatedRequestData, {
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${idToken}`,
-                },
+            await axiosInstance.put(`/editDonationRequest/${id}`, updatedRequestData, {
+                headers: { Authorization: `Bearer ${idToken}` },
             });
 
-            if (response.status === 200) {
-                toast.success("Donation request updated successfully!");
-                if (userRole === 'admin' || userRole === 'volunteer') {
-                    navigate('/dashboard/all-donation-requests');
-                } else {
-                    navigate('/dashboard/my-donation-requests');
-                }
-            } else {
-                throw new Error(response.data.message || 'Failed to update donation request.');
-            }
-
+            toast.success("Donation request updated successfully!");
+            navigate(isOwner ? "/dashboard/my-donation-requests" : "/dashboard/all-blood-donation-requests");
         } catch (error) {
-            console.error("Error updating donation request:", error);
-            if (axios.isAxiosError(error) && error.response && error.response.data && error.response.data.message) {
-                toast.error(`Update failed: ${error.response.data.message}`);
-            } else {
-                toast.error(`Update failed: ${error.message}`);
-            }
+            console.error(error);
+            toast.error("Update failed.");
         } finally {
             setIsSubmitting(false);
         }
     };
 
-    // Function to handle the cancel action with role-based navigation
+
     const handleCancel = () => {
-        if (userRole === 'admin' || userRole === 'volunteer') {
-            navigate('/dashboard/all-donation-requests');
-        } else {
-            navigate('/dashboard/my-donation-requests');
+        navigate(isAdmin || isVolunteer ? "/dashboard/all-blood-donation-requests" : "/dashboard/my-donation-requests");
+    };
+
+    const getStatusOptions = () => {
+        switch (formData.donationStatus) {
+            case "pending":
+                return ["pending", "inProgress", "cancel", "completed"];
+            case "inProgress":
+                return ["inProgress", "cancel", "completed"];
+            default:
+                return [formData.donationStatus];
         }
     };
 
-    if (isLoadingForm) {
+    const DonorModal = () => (
+        <div className="fixed inset-0 bg-gradient-to-br from-blue-50 to-red-50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-xl shadow-lg p-6 w-full max-w-md">
+                <h2 className="text-xl font-bold mb-4">Select Donor</h2>
+                <select
+                    value={selectedDonor}
+                    onChange={(e) => setSelectedDonor(e.target.value)}
+                    className="select select-bordered w-full mb-4"
+                >
+                    <option value="">-- Choose a Donor --</option>
+                    {allUsers.map((u) => (
+                        <option key={u._id} value={u._id}>
+                            {u.name} ({u.email})
+                        </option>
+                    ))}
+                </select>
+                <div className="flex justify-end gap-3">
+                    <button
+                        onClick={() => {
+                            setSelectedDonor("");
+                            setShowDonorModal(false);
+                            setFormData((prev) => ({ ...prev, donationStatus: "pending" }));
+                        }}
+                        className="btn btn-ghost"
+                    >
+                        Cancel
+                    </button>
+                    <button
+                        onClick={() => {
+                            if (!selectedDonor) {
+                                toast.error("Please select a donor.");
+                                return;
+                            }
+                            setShowDonorModal(false);
+                        }}
+                        className="btn bg-blue-600 text-white"
+                    >
+                        Confirm
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+
+    if (isLoadingForm || isRoleLoading) {
         return (
-            <div className="min-h-screen bg-gradient-to-br from-blue-50 to-red-50 flex items-center justify-center p-4 font-sans">
+            <div className="min-h-screen flex items-center justify-center">
                 <span className="loading loading-spinner loading-lg text-blue-600"></span>
-                <p className="ml-3 text-lg text-gray-700">Loading request details...</p>
+                <p className="ml-3 text-lg text-gray-700">Loading...</p>
             </div>
         );
     }
 
-    const canRender = userRole === 'admin' || userRole === 'volunteer' || user?.uid === formData.uid;
-    if (!canRender) {
-        return (
-            <div className="min-h-screen bg-gradient-to-br from-blue-50 to-red-50 flex items-center justify-center p-4 font-sans">
-                <div className="w-full max-w-md bg-white rounded-2xl shadow-2xl p-8 text-center border border-red-300">
-                    <h1 className="text-4xl font-extrabold text-red-700 mb-4">Access Denied</h1>
-                    <p className="text-lg text-gray-700 mb-6">
-                        You do not have permission to edit this donation request.
-                    </p>
-                    <button
-                        onClick={() => navigate('/dashboard/my-donation-requests')}
-                        className="btn bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg transition-all duration-300"
-                    >
-                        Go to My Requests
-                    </button>
-                </div>
-            </div>
-        );
+    if (!(isAdmin || isVolunteer || isOwner)) {
+        return <p className="text-center text-red-500">Access Denied</p>;
     }
 
     return (
         <div className="min-h-screen bg-gradient-to-br from-blue-50 to-red-50 flex items-center justify-center p-4 font-sans">
             <div className="w-full max-w-2xl bg-white rounded-2xl shadow-2xl p-8 border border-blue-100">
-                <div className="text-center mb-8">
-                    <h1 className="text-4xl font-extrabold text-blue-800 mb-2">Edit Donation Request</h1>
-                    {(userRole === 'admin' || userRole === 'volunteer') && donationRequest && (
-                        <p className="text-md text-red-600 font-medium mt-2">
-                            {userRole === 'admin' ? "Admin Mode:" : "Volunteer Mode:"} Editing request for **{donationRequest.requesterName}**
-                        </p>
-                    )}
-                    <p className="text-lg text-gray-600">Modify the details of this blood donation request.</p>
-                </div>
-
+                <h1 className="text-4xl font-extrabold text-blue-800 mb-6 text-center">Edit Donation Request</h1>
                 <form onSubmit={handleSubmit} className="space-y-6">
-                    {/* Requester Info (Read-only) */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                            <label className="block text-gray-700 text-sm font-semibold mb-2">Requester Name</label>
-                            <input
-                                type="text"
-                                className="input input-bordered w-full bg-gray-100 cursor-not-allowed"
-                                value={formData.requesterName}
-                                readOnly
-                                disabled
-                            />
-                        </div>
-                        <div>
-                            <label className="block text-gray-700 text-sm font-semibold mb-2">Requester Email</label>
-                            <input
-                                type="email"
-                                className="input input-bordered w-full bg-gray-100 cursor-not-allowed"
-                                value={formData.requesterEmail}
-                                readOnly
-                                disabled
-                            />
-                        </div>
+                    {/* Status */}
+                    <div className="pt-4 border-t border-gray-200">
+                        <span className="block text-gray-700 text-sm font-semibold mb-2">
+                            Current Donation Status: <span className="text-amber-800 font-semibold">{formData.donationStatus}</span>
+                        </span>
+                        <select
+                            id="donationStatus"
+                            name="donationStatus"
+                            value={formData.donationStatus}
+                            onChange={handleChange}
+                            className="select select-bordered w-full px-4 py-2 rounded-lg"
+                        >
+                            {getStatusOptions().map((status) => (
+                                <option key={status} value={status}>{status}</option>
+                            ))}
+                        </select>
                     </div>
 
-                    {/* Admin and Volunteer: Status dropdown */}
-                    {(userRole === 'admin' || userRole === 'volunteer') && (
-                        <div className="pt-4 border-t border-gray-200">
-                            <label htmlFor="donationStatus" className="block text-gray-700 text-sm font-semibold mb-2">Donation Status ({userRole === 'admin' ? 'Admin Only' : 'Volunteer and Admin'})</label>
-                            <select
-                                id="donationStatus"
-                                name="donationStatus"
-                                value={formData.donationStatus}
-                                onChange={handleChange}
-                                className="select select-bordered w-full px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
-                            >
-                                <option value="pending">Pending</option>
-                                <option value="inProgress">In Progress</option>
-                                {/* Only admins can mark as completed */}
-                                {userRole === 'admin' && <option value="completed">Completed</option>}
-                            </select>
-                        </div>
-                    )}
-                    <h2 className="text-2xl font-bold text-red-700 pt-4 border-t border-gray-200">Recipient Details</h2>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                            <label htmlFor="recipientName" className="block text-gray-700 text-sm font-semibold mb-2">Recipient Name</label>
-                            <input
-                                type="text"
-                                id="recipientName"
-                                name="recipientName"
-                                value={formData.recipientName}
-                                onChange={handleChange}
-                                className="input input-bordered w-full px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                placeholder="e.g., Jane Doe"
-                                required
-                            />
-                        </div>
-                        <div>
-                            <label htmlFor="bloodGroup" className="block text-gray-700 text-sm font-semibold mb-2">Required Blood Group</label>
-                            <select
-                                id="bloodGroup"
-                                name="bloodGroup"
-                                value={formData.bloodGroup}
-                                onChange={handleChange}
-                                className="select select-bordered w-full px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                required
-                            >
-                                <option value="" disabled>Select blood group</option>
-                                <option value="A+">A+</option>
-                                <option value="A-">A-</option>
-                                <option value="B+">B+</option>
-                                <option value="B-">B-</option>
-                                <option value="AB+">AB+</option>
-                                <option value="AB-">AB-</option>
-                                <option value="O+">O+</option>
-                                <option value="O-">O-</option>
-                            </select>
-                        </div>
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                            <label htmlFor="recipientDistrict" className="block text-gray-700 text-sm font-semibold mb-2">Recipient District</label>
-                            <select
-                                id="recipientDistrict"
-                                name="recipientDistrict"
-                                value={formData.recipientDistrict}
-                                onChange={handleChange}
-                                className="select select-bordered w-full px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                required
-                            >
-                                <option value="" disabled>Select district</option>
-                                {districts.map(d => (
-                                    <option key={d.id} value={d.name}>{d.name}</option>
-                                ))}
-                            </select>
-                        </div>
-                        <div>
-                            <label htmlFor="recipientUpazila" className="block text-gray-700 text-sm font-semibold mb-2">Recipient Upazila</label>
-                            <select
-                                id="recipientUpazila"
-                                name="recipientUpazila"
-                                value={formData.recipientUpazila}
-                                onChange={handleChange}
-                                className="select select-bordered w-full px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                required
-                                disabled={!formData.recipientDistrict}
-                            >
-                                <option value="" disabled>Select upazila</option>
-                                {filteredUpazilas.map(u => (
-                                    <option key={u.id} value={u.name}>{u.name}</option>
-                                ))}
-                            </select>
-                            {!formData.recipientDistrict && (
-                                <p className="text-sm text-gray-500 mt-1">Select a district first.</p>
+                    {/* Recipient Details */}
+                    {[
+                        "recipientName",
+                        "recipientDistrict",
+                        "recipientUpazila",
+                        "recipientStreet",
+                        "hospitalName",
+                        "donationDate",
+                        "donationTime",
+                        "bloodGroup",
+                        "requestMessage",
+                    ].map((field) => (
+                        <div key={field}>
+                            <label className="block text-gray-700">{field.replace(/([A-Z])/g, " $1")}</label>
+                            {field === "recipientDistrict" ? (
+                                <select
+                                    name={field}
+                                    value={formData[field] || ""}
+                                    onChange={handleChange}
+                                    className="select select-bordered w-full"
+                                    disabled={isVolunteer}
+                                >
+                                    <option value="">Select district</option>
+                                    {districts.map((d) => (
+                                        <option key={d.id} value={d.name}>{d.name}</option>
+                                    ))}
+                                </select>
+                            ) : field === "recipientUpazila" ? (
+                                <select
+                                    name={field}
+                                    value={formData[field] || ""}
+                                    onChange={handleChange}
+                                    className="select select-bordered w-full"
+                                    disabled={isVolunteer || !formData.recipientDistrict}
+                                >
+                                    <option value="">Select upazila</option>
+                                    {filteredUpazilas.map((u) => (
+                                        <option key={u.id} value={u.name}>{u.name}</option>
+                                    ))}
+                                </select>
+                            ) : field === "requestMessage" ? (
+                                <textarea
+                                    name={field}
+                                    value={formData[field] || ""}
+                                    onChange={handleChange}
+                                    className="textarea textarea-bordered w-full"
+                                    disabled={isVolunteer}
+                                />
+                            ) : field === "bloodGroup" ? (
+                                <select
+                                    name={field}
+                                    value={formData[field] || ""}
+                                    onChange={handleChange}
+                                    className="select select-bordered w-full"
+                                    disabled={isVolunteer}
+                                >
+                                    <option value="">Select blood group</option>
+                                    {["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"].map((bg) => (
+                                        <option key={bg} value={bg}>{bg}</option>
+                                    ))}
+                                </select>
+                            ) : (
+                                <input
+                                    type={field.includes("Date") ? "date" : field.includes("Time") ? "time" : "text"}
+                                    name={field}
+                                    value={formData[field] || ""}
+                                    onChange={handleChange}
+                                    className="input input-bordered w-full"
+                                    disabled={isVolunteer}
+                                />
                             )}
                         </div>
-                    </div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                            <label htmlFor="recipientStreet" className="block text-gray-700 text-sm font-semibold mb-2">Recipient Street Address</label>
-                            <input
-                                type="text"
-                                id="recipientStreet"
-                                name="recipientStreet"
-                                value={formData.recipientStreet}
-                                onChange={handleChange}
-                                className="input input-bordered w-full px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                placeholder="e.g., 123 Main St"
-                                required
-                            />
-                        </div>
-                        <div>
-                            <label htmlFor="hospitalName" className="block text-gray-700 text-sm font-semibold mb-2">Hospital Name</label>
-                            <input
-                                type="text"
-                                id="hospitalName"
-                                name="hospitalName"
-                                value={formData.hospitalName}
-                                onChange={handleChange}
-                                className="input input-bordered w-full px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                placeholder="e.g., City General Hospital"
-                                required
-                            />
-                        </div>
-                    </div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                            <label htmlFor="donationDate" className="block text-gray-700 text-sm font-semibold mb-2">Donation Date</label>
-                            <input
-                                type="date"
-                                id="donationDate"
-                                name="donationDate"
-                                value={formData.donationDate}
-                                onChange={handleChange}
-                                className="input input-bordered w-full px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                required
-                            />
-                        </div>
-                        <div>
-                            <label htmlFor="donationTime" className="block text-gray-700 text-sm font-semibold mb-2">Donation Time</label>
-                            <input
-                                type="time"
-                                id="donationTime"
-                                name="donationTime"
-                                value={formData.donationTime}
-                                onChange={handleChange}
-                                className="input input-bordered w-full px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                required
-                            />
-                        </div>
-                    </div>
-                    <div>
-                        <label htmlFor="requestMessage" className="block text-gray-700 text-sm font-semibold mb-2">Request Message (Optional)</label>
-                        <textarea
-                            id="requestMessage"
-                            name="requestMessage"
-                            value={formData.requestMessage}
-                            onChange={handleChange}
-                            className="textarea textarea-bordered w-full px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 h-24"
-                            placeholder="Add any additional details for the donor..."
-                        ></textarea>
-                    </div>
+                    ))}
 
                     <div className="flex justify-end gap-3 mt-6">
                         <button
                             type="button"
                             onClick={handleCancel}
-                            className="btn btn-ghost text-gray-600 hover:text-red-600 transition-colors duration-200 flex items-center"
+                            className="btn btn-ghost text-gray-600 hover:text-red-600 flex items-center"
                         >
                             <FaTimesCircle className="mr-2" /> Cancel
                         </button>
                         <button
                             type="submit"
-                            className="btn bg-blue-600 hover:bg-blue-700 text-white font-bold transition-colors duration-200 flex items-center"
+                            className="btn bg-blue-600 hover:bg-blue-700 text-white font-bold flex items-center"
                             disabled={isSubmitting}
                         >
                             {isSubmitting ? (
@@ -435,6 +417,7 @@ const EditDonationRequest = () => {
                     </div>
                 </form>
             </div>
+            {showDonorModal && <DonorModal />}
         </div>
     );
 };

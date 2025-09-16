@@ -14,6 +14,7 @@ const DonorDashboardHome = () => {
     const [requestsLoading, setRequestsLoading] = useState(true);
     const [errorFetchingRequests, setErrorFetchingRequests] = useState(false);
 
+    // Fetch recent donation requests for the logged-in donor
     useEffect(() => {
         const fetchRecentDonationRequests = async () => {
             // Wait for user and loading state to be ready
@@ -85,7 +86,8 @@ const DonorDashboardHome = () => {
             showCancelButton: true,
             confirmButtonColor: "#d33",
             cancelButtonColor: "#3085d6",
-            confirmButtonText: "Yes, cancel it!"
+            confirmButtonText: "Yes, Cancel Request!",
+            cancelButtonText: "No"
         });
 
         if (result.isConfirmed) {

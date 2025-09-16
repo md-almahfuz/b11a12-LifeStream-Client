@@ -60,13 +60,23 @@ const AuthProvider = ({ children }) => {
         return signInWithPopup(auth, googleProvider);
     };
 
+    // Logout function
     const logOut = () => {
         setLoading(true);
         return signOut(auth);
     };
 
+    // Function to update user profile
     const updateUserProfile = (profileUpdates) => {
         return updateProfile(auth.currentUser, profileUpdates);
+    };
+
+    // Function to get the current user's ID token
+    const getFirebaseIdToken = async () => {
+        if (auth.currentUser) {
+            return await auth.currentUser.getIdToken();
+        }
+        return null;
     };
 
     // Firebase Auth State Observer
@@ -110,6 +120,7 @@ const AuthProvider = ({ children }) => {
         signInWithGoogle,
         logOut,
         updateUserProfile,
+        getFirebaseIdToken, // Pass the new function to the context
     };
 
     return (

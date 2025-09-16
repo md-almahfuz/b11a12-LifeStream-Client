@@ -90,7 +90,7 @@ const Router = createBrowserRouter([
     },
     {
         path: "/dashboard",
-        element: <DashboardLayout />,
+        element: <PrivateRoute><DashboardLayout /></PrivateRoute>,
         children: [
             {
                 index: true,
@@ -128,7 +128,7 @@ const Router = createBrowserRouter([
                 hydrateFallbackElement: <Loading />,
             },
             {
-                path: "all-requests",
+                path: "my-donation-requests",
                 element: <ShowDonationRequests />,
                 loader: async () => {
                     const user = await getAuthReady();
@@ -145,46 +145,129 @@ const Router = createBrowserRouter([
                 },
                 hydrateFallbackElement: <Loading />,
             },
+            // {
+            //     path: "all-donation-requests",
+            //     element: <ShowDonationRequests />,
+            //     loader: async () => {
+            //         const user = await getAuthReady();
+            //         if (!user) return redirect('/auth/login');
+            //         try {
+            //             const response = await axiosInstance.get(`/all-donation-requests`);
+            //             return { myDonations: response.data, error: null };
+            //         } catch (error) {
+            //             const errorMessage = axios.isAxiosError(error) && error.response?.data?.message
+            //                 ? error.response.data.message
+            //                 : error.message;
+            //             return { myDonations: [], error: { message: errorMessage } };
+            //         }
+            //     },
+            //     hydrateFallbackElement: <Loading />,
+            // },
+
             {
-                path: "all-donation-requests",
+                path: "all-blood-donation-requests",
                 element: <ShowDonationRequests />,
                 loader: async () => {
                     const user = await getAuthReady();
-                    if (!user) return redirect('/auth/login');
+                    if (!user) {
+                        // Redirect unauthenticated users
+                        return redirect('/auth/login');
+                    }
+
                     try {
-                        const response = await axiosInstance.get(`/all-donation-requests`);
-                        return { myDonations: response.data, error: null };
+                        // Fetch the donation requests
+                        const donationRequestsResponse = await axiosInstance.get(`/all-donation-requests`);
+
+                        // Fetch the user's role from the new backend endpoint
+                        const userRoleResponse = await axiosInstance.get(`/get-user-role`);
+
+                        // Return both the donation data and the user object with the role
+                        return {
+                            myDonations: donationRequestsResponse.data,
+                            user: {
+                                uid: user.uid,
+                                role: userRoleResponse.data.role, // Use the role from the backend
+                                status: userRoleResponse.data.status // Use the status from the backend
+                            },
+                            error: null
+                        };
                     } catch (error) {
+                        // Handle API errors
                         const errorMessage = axios.isAxiosError(error) && error.response?.data?.message
                             ? error.response.data.message
                             : error.message;
-                        return { myDonations: [], error: { message: errorMessage } };
+
+                        // Return an error object along with the user data
+                        return { myDonations: [], user: null, error: { message: errorMessage } };
                     }
                 },
                 hydrateFallbackElement: <Loading />,
             },
+
+            // {
+            //     path: "edit-donation-request/:id",
+            //     element: <EditDonationRequest />,
+            //     loader: async ({ params }) => {
+            //         const user = await getAuthReady();
+            //         if (!user) return redirect('/auth/login');
+            //         const requestId = params.id;
+            //         if (!requestId) return { donationRequest: null, error: { message: "Donation Request ID is missing." } };
+            //         try {
+            //             const idToken = await user.getIdToken();
+            //             const roleResponse = await axiosInstance.get(`/get-user-role`, { headers: { 'Authorization': `Bearer ${idToken}` } });
+            //             const userRole = roleResponse.data.role;
+            //             const response = await axiosInstance.get(`/donationRequests/${requestId}`, { headers: { 'Authorization': `Bearer ${await user.getIdToken()}` } });
+            //             const isOwner = response.data.uid === user.uid;
+            //             const isAdmin = userRole === 'admin';
+            //             if (!isOwner && !isAdmin) return redirect('/dashboard/my-donation-requests');
+            //             return { donationRequest: response.data, error: null };
+            //         } catch (error) {
+            //             const errorMessage = axios.isAxiosError(error) && error.response?.data?.message
+            //                 ? error.response.data.message
+            //                 : error.message;
+            //             if (axios.isAxiosError(error) && error.response?.status === 404) return { donationRequest: null, error: { message: "Donation request not found." } };
+            //             return { donationRequest: null, error: { message: errorMessage } };
+            //         }
+            //     },
+            //     hydrateFallbackElement: <Loading />,
+            // },
             {
                 path: "edit-donation-request/:id",
-                element: <EditDonationRequest />,
+                element: <PrivateRoute><EditDonationRequest /></PrivateRoute>,
                 loader: async ({ params }) => {
                     const user = await getAuthReady();
                     if (!user) return redirect('/auth/login');
                     const requestId = params.id;
                     if (!requestId) return { donationRequest: null, error: { message: "Donation Request ID is missing." } };
+
                     try {
+                        // First, fetch the user's role and wait for it
                         const idToken = await user.getIdToken();
                         const roleResponse = await axiosInstance.get(`/get-user-role`, { headers: { 'Authorization': `Bearer ${idToken}` } });
                         const userRole = roleResponse.data.role;
-                        const response = await axiosInstance.get(`/donationRequests/${requestId}`, { headers: { 'Authorization': `Bearer ${await user.getIdToken()}` } });
+
+                        // Now, fetch the donation request
+                        const response = await axiosInstance.get(`/donationRequests/${requestId}`, { headers: { 'Authorization': `Bearer ${idToken}` } });
+
+                        // Now that we have both the request and the user's role, we can check permissions
                         const isOwner = response.data.uid === user.uid;
                         const isAdmin = userRole === 'admin';
-                        if (!isOwner && !isAdmin) return redirect('/dashboard/my-donation-requests');
+                        const isVolunteer = userRole === 'volunteer';
+
+                        if (!isOwner && !isAdmin && !isVolunteer) {
+                            // Redirect if the user is neither the owner nor an admin
+                            return redirect('/dashboard');
+                        }
+
                         return { donationRequest: response.data, error: null };
                     } catch (error) {
+                        // Error handling remains the same
                         const errorMessage = axios.isAxiosError(error) && error.response?.data?.message
                             ? error.response.data.message
                             : error.message;
-                        if (axios.isAxiosError(error) && error.response?.status === 404) return { donationRequest: null, error: { message: "Donation request not found." } };
+                        if (axios.isAxiosError(error) && error.response?.status === 404) {
+                            return { donationRequest: null, error: { message: "Donation request not found." } };
+                        }
                         return { donationRequest: null, error: { message: errorMessage } };
                     }
                 },

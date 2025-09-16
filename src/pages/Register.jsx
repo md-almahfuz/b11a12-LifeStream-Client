@@ -3,11 +3,12 @@ import { AiOutlineEye, AiOutlineEyeInvisible } from 'react-icons/ai';
 import { Link, useNavigate } from 'react-router';
 import { toast } from 'react-toastify';
 import { AuthContext } from '../provider/AuthProvider';
-import { FaPaperPlane } from 'react-icons/fa'; // Added FaPaperPlane import
+import { FaPaperPlane } from 'react-icons/fa';
+import axios from 'axios';
 
 const Register = () => {
     const SERVER_ADDRESS = import.meta.env.VITE_SERVER_URL || 'http://localhost:3000';
-    const { createUser, setUser, updateUserProfile } = useContext(AuthContext);
+    const { createUser, updateUserProfile } = useContext(AuthContext);
     const navigate = useNavigate();
 
     // State for form data
@@ -40,17 +41,13 @@ const Register = () => {
         const loadLocationData = async () => {
             try {
                 // Fetch districts
-                // Ensure the path is correct: /data/districts.json if in public/data
                 const districtsRes = await fetch('/districts.json');
                 const districtsJson = await districtsRes.json();
-                // Correctly access the 'data' array from the provided districts.json structure
                 setDistricts(districtsJson[2].data);
 
                 // Fetch upazilas
-                // Ensure the path is correct: /data/upazilas.json if in public/data
                 const upazilasRes = await fetch('/upazilas.json');
                 const upazilasJson = await upazilasRes.json();
-                // Correctly access the 'data' array from the provided upazilas.json structure
                 setAllUpazilas(upazilasJson[2].data);
             } catch (error) {
                 console.error("Failed to load location data:", error);
@@ -63,10 +60,8 @@ const Register = () => {
     // Effect to filter upazilas when district changes
     useEffect(() => {
         if (formData.district) {
-            // Find the district ID based on the selected district name
             const selectedDistrictId = districts.find(d => d.name === formData.district)?.id;
             if (selectedDistrictId) {
-                // Filter all upazilas by the selected district ID
                 const filtered = allUpazilas.filter(upazila => upazila.district_id === selectedDistrictId);
                 setFilteredUpazilas(filtered);
             } else {
@@ -75,7 +70,6 @@ const Register = () => {
         } else {
             setFilteredUpazilas([]);
         }
-        // Reset upazila selection when district changes
         setFormData(prev => ({ ...prev, upazila: '' }));
     }, [formData.district, districts, allUpazilas]);
 
@@ -90,28 +84,18 @@ const Register = () => {
 
     const saveUserDataToDatabase = async (userId, userData) => {
         try {
-            console.log("Attempting to save user data to DB:", userData); // Log data being sent
-            const response = await fetch(`${SERVER_ADDRESS}/Users`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify(userData),
-            });
-
-            // Log the full response for debugging
-            const responseData = await response.json(); // Try to parse response even if not ok
+            console.log("Attempting to save user data to DB:", userData);
+            const response = await axios.post(`${SERVER_ADDRESS}/Users`, userData);
             console.log("DB save response status:", response.status);
-            console.log("DB save response data:", responseData);
-
-            if (!response.ok) {
-                // Throw an error with more details from the server response
-                throw new Error(`Failed to save user data: ${responseData.message || response.statusText}`);
-            }
-            return responseData;
+            console.log("DB save response data:", response.data);
+            return response.data;
         } catch (error) {
             console.error("Error saving user data:", error);
-            // Re-throw to be caught by handleRegister's catch block
+            if (axios.isAxiosError(error) && error.response) {
+                // Log the server error response if available
+                console.error("Server responded with:", error.response.status, error.response.data);
+                throw new Error(error.response.data.message || error.message);
+            }
             throw error;
         }
     };
@@ -119,10 +103,6 @@ const Register = () => {
     const handleRegister = async (e) => {
         e.preventDefault();
         const { name, photoURL, email, password, confirmPassword, bloodGroup, district, upazila } = formData;
-
-        console.log("Form Data on Register:", formData); // Log form data for debugging
-        console.log("Email:", email); // Log email for debugging
-        console.log("Photo URL:", photoURL); // Log photo URL for debugging
 
         // Client-side validation
         if (password !== confirmPassword) {
@@ -141,10 +121,6 @@ const Register = () => {
             toast.error("Password must contain at least one lowercase letter.");
             return;
         }
-        // Add more complex password validation if needed (numbers, special chars)
-        // if (!/\d/.test(password)) { toast.error("Password must contain at least one digit."); return; }
-        // if (!/[!@#$%^&*(),.?":{}|<>]/.test(password)) { toast.error("Password must contain at least one special character."); return; }
-
         if (!acceptTerms) {
             setTermsError("You must accept the Terms & Conditions.");
             return;
@@ -153,32 +129,32 @@ const Register = () => {
         }
 
         try {
+            // Step 1: Create a new user in Firebase Authentication
             const userCredential = await createUser(email, password);
             const user = userCredential.user;
 
-            // FIX: Ensure photoURL is null if empty string for updateUserProfile
-            const UpdateedPhotoURL = photoURL.trim() === '' ? null : photoURL;
+            // Step 2: Clean up the photoURL and set it on the Firebase user profile
+            const updatedPhotoURL = photoURL.trim() === '' ? null : photoURL;
+            await updateUserProfile({ displayName: name, photoURL: updatedPhotoURL });
+            console.log("User profile updated:", { displayName: name, photoURL: updatedPhotoURL });
 
-            await updateUserProfile(name, UpdateedPhotoURL);
-
-            console.log("User profile updated:", { displayName: name, photoURL: UpdateedPhotoURL });
-
-            // IMPORTANT: Include uid in the data object
+            // Step 3: Save user data to your own backend database
             await saveUserDataToDatabase(user.uid, {
-                uid: user.uid, // Explicitly adding uid to the data object
+                uid: user.uid,
                 name,
                 email,
-                photoURL: UpdateedPhotoURL,
+                photoURL: updatedPhotoURL,
                 bloodGroup,
                 district,
                 upazila,
-                status: 'active', // Default status
+                status: 'active',
                 createdAt: new Date().toISOString(),
                 role: 'donor',
             });
 
+            // The AuthContext's onAuthStateChanged listener will automatically update the user state.
+            // No need to call setUser directly.
 
-            //  setUser({ ...user, displayName: name, photoURL: UpdateedPhotoURL }); // Update context user with cleaned photoURL
             toast.success("Registration successful! Welcome to LifeStream.");
             navigate("/");
         } catch (error) {
@@ -189,7 +165,6 @@ const Register = () => {
             } else if (error.code === "auth/weak-password") {
                 toast.error("Password is too weak. Please use a stronger password.");
             } else {
-                // Display the error message from saveUserDataToDatabase if it's the source of the error
                 toast.error(`Registration failed: ${error.message}`);
                 console.error("Registration Error:", error);
             }
@@ -198,7 +173,6 @@ const Register = () => {
 
     const togglePasswordVisibility = () => setShowPassword(!showPassword);
     const toggleConfirmPasswordVisibility = () => setShowConfirmPassword(!showConfirmPassword);
-
 
     return (
         <div className="min-h-screen bg-gradient-to-br from-blue-50 to-red-50 flex items-center justify-center p-4 font-sans">
@@ -222,12 +196,11 @@ const Register = () => {
                             required
                         />
                     </div>
-
                     {/* Photo URL */}
                     <div>
                         <label htmlFor="photoURL" className="block text-gray-700 text-sm font-semibold mb-2">Photo URL (Optional)</label>
                         <input
-                            type="url" // Changed to url type for better input validation
+                            type="url"
                             id="photoURL"
                             name="photoURL"
                             value={formData.photoURL}
@@ -236,7 +209,6 @@ const Register = () => {
                             placeholder="https://example.com/your-photo.jpg"
                         />
                     </div>
-
                     {/* Email */}
                     <div>
                         <label htmlFor="email" className="block text-gray-700 text-sm font-semibold mb-2">Your Email</label>
@@ -251,7 +223,6 @@ const Register = () => {
                             required
                         />
                     </div>
-
                     {/* Password */}
                     <div>
                         <label htmlFor="password" className="block text-gray-700 text-sm font-semibold mb-2">Password</label>
@@ -278,7 +249,6 @@ const Register = () => {
                             </span>
                         </div>
                     </div>
-
                     {/* Confirm Password */}
                     <div>
                         <label htmlFor="confirmPassword" className="block text-gray-700 text-sm font-semibold mb-2">Confirm Password</label>
@@ -305,7 +275,6 @@ const Register = () => {
                             </span>
                         </div>
                     </div>
-
                     {/* Blood Group */}
                     <div>
                         <label htmlFor="bloodGroup" className="block text-gray-700 text-sm font-semibold mb-2">Select Your Blood Group</label>
@@ -328,7 +297,6 @@ const Register = () => {
                             <option value="O-">O-</option>
                         </select>
                     </div>
-
                     {/* District */}
                     <div>
                         <label htmlFor="district" className="block text-gray-700 text-sm font-semibold mb-2">Your District</label>
@@ -346,7 +314,6 @@ const Register = () => {
                             ))}
                         </select>
                     </div>
-
                     {/* Upazila */}
                     <div>
                         <label htmlFor="upazila" className="block text-gray-700 text-sm font-semibold mb-2">Your Upazila</label>
@@ -357,7 +324,7 @@ const Register = () => {
                             onChange={handleChange}
                             className="select select-bordered w-full px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                             required
-                            disabled={!formData.district} // Disable if no district is selected
+                            disabled={!formData.district}
                         >
                             <option value="" disabled>Select an upazila</option>
                             {filteredUpazilas.map(u => (
@@ -368,7 +335,6 @@ const Register = () => {
                             <p className="text-sm text-gray-500 mt-1">Please select a district first to see upazilas.</p>
                         )}
                     </div>
-
                     {/* Terms & Conditions Checkbox */}
                     <div className="flex items-center">
                         <input
@@ -378,7 +344,7 @@ const Register = () => {
                             checked={acceptTerms}
                             onChange={(e) => {
                                 setAcceptTerms(e.target.checked);
-                                if (e.target.checked) setTermsError(''); // Clear error if checked
+                                if (e.target.checked) setTermsError('');
                             }}
                             className="checkbox checkbox-primary mr-2"
                         />
@@ -387,8 +353,6 @@ const Register = () => {
                         </label>
                     </div>
                     {termsError && <p className="text-red-500 text-sm -mt-3">{termsError}</p>}
-
-
                     {/* Register Button */}
                     <button
                         type="submit"
@@ -396,7 +360,6 @@ const Register = () => {
                     >
                         Register <FaPaperPlane className="ml-2" />
                     </button>
-
                     {/* Login Link */}
                     <p className="py-3 font-semibold text-center text-gray-700">
                         Already Have an Account?{" "}
@@ -409,5 +372,4 @@ const Register = () => {
         </div>
     );
 };
-
 export default Register;

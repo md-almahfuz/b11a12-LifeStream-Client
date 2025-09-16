@@ -1,13 +1,21 @@
 import React, { useState, useEffect, useContext } from 'react';
 import { toast } from 'react-toastify';
-import Swal from 'sweetalert2'; // Import SweetAlert2
-import { AuthContext } from '../provider/AuthProvider'; // Your authentication context
-import axiosInstance from '../api/axiosInstance'; // Your configured Axios instance
-import { FaUserCheck, FaUserSlash, FaUserTie, FaUserShield, FaSpinner } from 'react-icons/fa'; // Icons for actions
-import axios from 'axios'; // For axios.isAxiosError
+import Swal from 'sweetalert2';
+import { AuthContext } from '../provider/AuthProvider';
+import axiosInstance from '../api/axiosInstance';
+import { FaUserCheck, FaUserSlash, FaUserTie, FaUserShield, FaSpinner, FaFilePdf } from 'react-icons/fa';
+import axios from 'axios';
 
-// Ensure SweetAlert2 styles are included, e.g., in your main CSS file or index.js
-// import 'sweetalert2/dist/sweetalert2.css';
+// Load jsPDF and jspdf-autotable from CDN for client-side PDF generation
+const loadScript = (src) => {
+    return new Promise((resolve, reject) => {
+        const script = document.createElement('script');
+        script.src = src;
+        script.onload = resolve;
+        script.onerror = reject;
+        document.head.appendChild(script);
+    });
+};
 
 const UserManagement = () => {
     const { user, getFirebaseIdToken } = useContext(AuthContext);
@@ -16,6 +24,8 @@ const UserManagement = () => {
     const [error, setError] = useState(null);
     const [filterStatus, setFilterStatus] = useState('all');
     const [updatingUserId, setUpdatingUserId] = useState(null);
+    const [currentPage, setCurrentPage] = useState(1);
+    const [usersPerPage] = useState(10);
 
     // Fetch all users from the backend
     useEffect(() => {
@@ -30,7 +40,6 @@ const UserManagement = () => {
             setError(null);
 
             try {
-                // The axiosInstance interceptor should handle attaching the token
                 const response = await axiosInstance.get('/allusers');
                 setUsers(response.data);
             } catch (err) {
@@ -50,6 +59,7 @@ const UserManagement = () => {
         fetchUsers();
     }, [user]);
 
+    // This is the corrected and crucial part of the code
     // Filtered users based on selected status
     const filteredUsers = users.filter(u => {
         if (filterStatus === 'all') {
@@ -57,6 +67,76 @@ const UserManagement = () => {
         }
         return u.status === filterStatus;
     });
+
+    // Pagination logic moved here to ensure filteredUsers is defined
+    const indexOfLastUser = currentPage * usersPerPage;
+    const indexOfFirstUser = indexOfLastUser - usersPerPage;
+    const currentUsers = filteredUsers.slice(indexOfFirstUser, indexOfLastUser);
+
+    // Total number of pages
+    const totalPages = Math.ceil(filteredUsers.length / usersPerPage);
+
+    const handlePageChange = (pageNumber) => {
+        setCurrentPage(pageNumber);
+    };
+
+    // Function to generate and download PDF
+    const handleDownloadPdf = async () => {
+        await loadScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js');
+        await loadScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.25/jspdf.plugin.autotable.min.js');
+        const { jsPDF } = window.jspdf;
+
+        Swal.fire({
+            title: 'Generating PDF...',
+            text: 'Please wait, this may take a moment.',
+            allowOutsideClick: false,
+            didOpen: () => {
+                Swal.showLoading();
+            }
+        });
+
+        try {
+            const doc = new jsPDF();
+            const date = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+            const title = "LifeStream User Report";
+            const headers = [['Name', 'Email', 'Role', 'Status']];
+
+            const data = filteredUsers.map(user => [
+                user.name || 'N/A',
+                user.email || 'N/A',
+                user.role ? (user.role.charAt(0).toUpperCase() + user.role.slice(1)) : 'N/A',
+                user.status ? (user.status.charAt(0).toUpperCase() + user.status.slice(1)) : 'N/A'
+            ]);
+
+            doc.setFontSize(20);
+            doc.text(title, 14, 20);
+            doc.setFontSize(10);
+            doc.text(`Generated on: ${date}`, 14, 26);
+
+            doc.autoTable({
+                startY: 35,
+                head: headers,
+                body: data,
+                styles: { fontSize: 10, cellPadding: 2 },
+                headStyles: { fillColor: [71, 85, 105], textColor: 255 },
+                theme: 'striped',
+                columnStyles: {
+                    0: { cellWidth: 40 },
+                    1: { cellWidth: 60 },
+                    2: { cellWidth: 30 },
+                    3: { cellWidth: 30 },
+                }
+            });
+
+            doc.save('lifestream-users.pdf');
+            Swal.close();
+            toast.success('PDF generated successfully!');
+        } catch (err) {
+            console.error('Error generating PDF:', err);
+            Swal.close();
+            toast.error('Failed to generate PDF. Please try again.');
+        }
+    };
 
     // Handle status toggle (Block/Unblock)
     const handleToggleStatus = async (userId, currentStatus) => {
@@ -93,7 +173,6 @@ const UserManagement = () => {
     const handleChangeRole = async (userId, newRole) => {
         console.log("Changing role for user ID:", userId, "to new role:", newRole);
 
-        // SweetAlert warning only if the new role is 'admin'
         if (newRole === 'admin') {
             const result = await Swal.fire({
                 title: 'Are you sure?',
@@ -106,9 +185,7 @@ const UserManagement = () => {
                 cancelButtonText: 'Cancel'
             });
 
-            // If the user cancels, do not proceed with the role change.
             if (!result.isConfirmed) {
-                // Reset the select input to its previous value to avoid visual discrepancy.
                 return;
             }
         }
@@ -141,7 +218,6 @@ const UserManagement = () => {
         }
     };
 
-
     return (
         <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-50 p-6 font-sans">
             <div className="max-w-7xl mx-auto bg-white rounded-2xl shadow-2xl p-8 border border-blue-100">
@@ -150,20 +226,31 @@ const UserManagement = () => {
                     <p className="text-lg text-gray-600">Overview and control of user accounts on LifeStream.</p>
                 </div>
 
-                {/* Filter Dropdown */}
-                <div className="mb-6 flex justify-end items-center">
-                    <label htmlFor="statusFilter" className="block text-gray-700 text-sm font-semibold mr-3">Filter by Status:</label>
-                    <select
-                        id="statusFilter"
-                        name="statusFilter"
-                        value={filterStatus}
-                        onChange={(e) => setFilterStatus(e.target.value)}
-                        className="select select-bordered w-full max-w-xs px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                {/* Filter and Download Buttons */}
+                <div className="mb-6 flex flex-col md:flex-row justify-end items-center space-y-4 md:space-y-0 md:space-x-4">
+                    <button
+                        onClick={handleDownloadPdf}
+                        className="btn bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-lg flex items-center shadow-md transition-all duration-300 transform hover:scale-105"
                     >
-                        <option value="all">All</option>
-                        <option value="active">Active</option>
-                        <option value="blocked">Blocked</option>
-                    </select>
+                        <FaFilePdf className="mr-2" /> Download PDF
+                    </button>
+                    <div className="flex items-center">
+                        <label htmlFor="statusFilter" className="block text-gray-700 text-sm font-semibold mr-3">Filter by Status:</label>
+                        <select
+                            id="statusFilter"
+                            name="statusFilter"
+                            value={filterStatus}
+                            onChange={(e) => {
+                                setFilterStatus(e.target.value);
+                                setCurrentPage(1); // Reset to the first page when filter changes
+                            }}
+                            className="select select-bordered w-full max-w-xs px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                        >
+                            <option value="all">All</option>
+                            <option value="active">Active</option>
+                            <option value="blocked">Blocked</option>
+                        </select>
+                    </div>
                 </div>
 
                 {loading ? (
@@ -181,7 +268,7 @@ const UserManagement = () => {
                     </div>
                 ) : (
                     <div className="overflow-x-auto">
-                        <table className="table w-full border-collapse">
+                        <table id="users-table" className="table w-full border-collapse">
                             {/* Head */}
                             <thead className="bg-indigo-100 text-indigo-800 uppercase text-sm">
                                 <tr>
@@ -194,7 +281,7 @@ const UserManagement = () => {
                                 </tr>
                             </thead>
                             <tbody>
-                                {filteredUsers.map((u) => (
+                                {currentUsers.map((u) => (
                                     <tr key={u._id} className="border-b border-gray-200 hover:bg-gray-50">
                                         <td className="p-3">
                                             <div className="flex items-center space-x-3">
@@ -244,6 +331,36 @@ const UserManagement = () => {
                                 ))}
                             </tbody>
                         </table>
+                        {/* Pagination Controls */}
+                        <div className="flex justify-center items-center mt-6 space-x-2">
+                            <button
+                                onClick={() => handlePageChange(currentPage - 1)}
+                                disabled={currentPage === 1}
+                                className="px-3 py-1 bg-gray-200 rounded-lg disabled:opacity-50"
+                            >
+                                Previous
+                            </button>
+
+                            {[...Array(totalPages)].map((_, i) => (
+                                <button
+                                    key={i + 1}
+                                    onClick={() => handlePageChange(i + 1)}
+                                    className={`px-3 py-1 rounded-lg ${currentPage === i + 1 ? "bg-indigo-600 text-white" : "bg-gray-200"
+                                        }`}
+                                >
+                                    {i + 1}
+                                </button>
+                            ))}
+
+                            <button
+                                onClick={() => handlePageChange(currentPage + 1)}
+                                disabled={currentPage === totalPages}
+                                className="px-3 py-1 bg-gray-200 rounded-lg disabled:opacity-50"
+                            >
+                                Next
+                            </button>
+                        </div>
+
                     </div>
                 )}
             </div>
