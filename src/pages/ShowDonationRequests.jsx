@@ -215,7 +215,8 @@ const ShowDonationRequests = () => {
 
                                         {/* Column for Donor Info */}
                                         <td className="p-3 text-gray-700">
-                                            {donation.donationStatus === 'inProgress' && donation.donorName && donation.donorEmail ? (
+                                            {/* {donation.donationStatus === 'inProgress' && donation.donorName && donation.donorEmail ? ( */}
+                                            {donation.donorName && donation.donorEmail ? (
                                                 <div className="flex flex-col items-start space-y-1">
                                                     <div className="flex items-center">
                                                         <FaUserCircle className="text-gray-500 mr-2" />
@@ -227,7 +228,7 @@ const ShowDonationRequests = () => {
                                                     </div>
                                                 </div>
                                             ) : (
-                                                <span>N/A</span>
+                                                <span>No Donor Yet</span>
                                             )}
                                         </td>
                                         {/* <td className="p-3">

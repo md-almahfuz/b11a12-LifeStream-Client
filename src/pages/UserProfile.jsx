@@ -27,6 +27,8 @@ const UserProfile = () => {
     const [allUpazilas, setAllUpazilas] = useState([]);
     const [filteredUpazilas, setFilteredUpazilas] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
+    const [photoFile, setPhotoFile] = useState(null);
+
 
     // Debugging axiosInstance configuration
     useEffect(() => {
@@ -104,6 +106,25 @@ const UserProfile = () => {
         }
     }, [formData.district, districts, allUpazilas]);
 
+    const handleFileChange = (e) => {
+        if (e.target.files[0]) {
+            setPhotoFile(e.target.files[0]);
+        }
+    };
+
+    const uploadToImgBB = async (file) => {
+        const formData = new FormData();
+        formData.append("image", file);
+
+        const res = await fetch(`https://api.imgbb.com/1/upload?key=${import.meta.env.VITE_IMGBB_API_KEY}`, {
+            method: "POST",
+            body: formData,
+        });
+
+        const data = await res.json();
+        return data?.data?.url;
+    };
+
     const handleChange = (e) => {
         const { name, value } = e.target;
         setFormData(prevState => ({
@@ -115,10 +136,20 @@ const UserProfile = () => {
     const handleUpdateProfile = async (e) => {
         e.preventDefault();
 
-        const { name, photoURL, email, bloodGroup, district, upazila } = formData;
-        const photoUrlToUpdate = photoURL.trim() === '' ? null : photoURL;
+        const { name, email, bloodGroup, district, upazila } = formData;
+
+        // const { name, photoURL, email, bloodGroup, district, upazila } = formData;
+        // const photoUrlToUpdate = photoURL.trim() === '' ? null : photoURL;
+
+        let photoUrlToUpdate = formData.photoURL;
+
+
 
         try {
+            // Upload new image if selected
+            if (photoFile) {
+                photoUrlToUpdate = await uploadToImgBB(photoFile);
+            }
             await updateUserProfile({ displayName: name, photoURL: photoUrlToUpdate });
 
             // Correctly get the ID token from the user object
@@ -255,7 +286,7 @@ const UserProfile = () => {
                             />
                         </div>
 
-                        {/* Photo URL */}
+                        {/* Photo URL
                         <div>
                             <label htmlFor="photoURL" className="block text-gray-700 text-sm font-semibold mb-2">Photo URL (Optional)</label>
                             <input
@@ -267,6 +298,29 @@ const UserProfile = () => {
                                 onChange={handleChange}
                                 placeholder="https://example.com/your-photo.jpg"
                             />
+                        </div> */}
+
+                        {/* Profile Picture */}
+                        <div>
+                            <label htmlFor="photoFile" className="block text-gray-700 text-sm font-semibold mb-2">
+                                Update Profile Picture
+                            </label>
+                            <input
+                                type="file"
+                                id="photoFile"
+                                accept="image/*"
+                                onChange={handleFileChange}
+                                className="file-input file-input-bordered w-full"
+                            />
+                            {formData.photoURL && (
+                                <div className="mt-2">
+                                    <img
+                                        src={formData.photoURL}
+                                        alt="Current Profile"
+                                        className="w-20 h-20 rounded-full border"
+                                    />
+                                </div>
+                            )}
                         </div>
 
                         {/* Email (Read-only) */}

@@ -36,6 +36,9 @@ const Register = () => {
     const [acceptTerms, setAcceptTerms] = useState(false);
     const [termsError, setTermsError] = useState('');
 
+    // State for file upload
+    const [photoFile, setPhotoFile] = useState(null);
+
     // Load districts and upazilas from JSON files on component mount
     useEffect(() => {
         const loadLocationData = async () => {
@@ -80,6 +83,26 @@ const Register = () => {
             ...prevState,
             [name]: value
         }));
+    };
+
+    // Handle file input change
+    const handleFileChange = (e) => {
+        if (e.target.files[0]) {
+            setPhotoFile(e.target.files[0]);
+        }
+    };
+
+    const uploadToImgBB = async (file) => {
+        const formData = new FormData();
+        formData.append("image", file);
+
+        const res = await fetch(`https://api.imgbb.com/1/upload?key=${import.meta.env.VITE_IMGBB_API_KEY}`, {
+            method: "POST",
+            body: formData,
+        });
+
+        const data = await res.json();
+        return data?.data?.url;
     };
 
     const saveUserDataToDatabase = async (userId, userData) => {
@@ -134,6 +157,12 @@ const Register = () => {
             const user = userCredential.user;
 
             // Step 2: Clean up the photoURL and set it on the Firebase user profile
+            // Upload to ImgBB if file selected
+            let uploadedPhotoURL = "";
+
+            if (photoFile) {
+                uploadedPhotoURL = await uploadToImgBB(photoFile);
+            }
             const updatedPhotoURL = photoURL.trim() === '' ? null : photoURL;
             await updateUserProfile({ displayName: name, photoURL: updatedPhotoURL });
             console.log("User profile updated:", { displayName: name, photoURL: updatedPhotoURL });
@@ -143,7 +172,7 @@ const Register = () => {
                 uid: user.uid,
                 name,
                 email,
-                photoURL: updatedPhotoURL,
+                photoURL: uploadedPhotoURL,
                 bloodGroup,
                 district,
                 upazila,
@@ -197,7 +226,7 @@ const Register = () => {
                         />
                     </div>
                     {/* Photo URL */}
-                    <div>
+                    {/* <div>
                         <label htmlFor="photoURL" className="block text-gray-700 text-sm font-semibold mb-2">Photo URL (Optional)</label>
                         <input
                             type="url"
@@ -207,6 +236,19 @@ const Register = () => {
                             onChange={handleChange}
                             className="input input-bordered w-full px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                             placeholder="https://example.com/your-photo.jpg"
+                        />
+                    </div> */}
+                    {/* Profile Picture */}
+                    <div>
+                        <label htmlFor="photoFile" className="block text-gray-700 text-sm font-semibold mb-2">
+                            Profile Picture (Optional)
+                        </label>
+                        <input
+                            type="file"
+                            id="photoFile"
+                            accept="image/*"
+                            onChange={handleFileChange}
+                            className="file-input file-input-bordered w-full"
                         />
                     </div>
                     {/* Email */}

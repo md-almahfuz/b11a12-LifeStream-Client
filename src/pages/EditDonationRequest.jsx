@@ -30,7 +30,6 @@ const EditDonationRequest = () => {
     const isAdmin = userRole === "admin";
     const isVolunteer = userRole === "volunteer";
 
-
     // Load initial data
     useEffect(() => {
         const loadInitialData = async () => {
@@ -86,13 +85,16 @@ const EditDonationRequest = () => {
     const handleChange = (e) => {
         const { name, value } = e.target;
 
-        if (
-            name === "donationStatus" &&
-            (isAdmin || isVolunteer || isOwner) &&
-            previousStatus === "pending" &&
-            value === "inProgress"
-        ) {
-            setShowDonorModal(true);
+        if (name === "donationStatus" && (isAdmin || isVolunteer || isOwner)) {
+            // Case 1: pending → inProgress
+            if (previousStatus === "pending" && value === "inProgress") {
+                setShowDonorModal(true);
+            }
+
+            // Case 2: Selecting completed but no donor exists
+            if (value === "completed" && !selectedDonor && !formData.donorName) {
+                setShowDonorModal(true);
+            }
         }
 
         setFormData((prev) => ({ ...prev, [name]: value }));
@@ -108,63 +110,15 @@ const EditDonationRequest = () => {
         }
     };
 
-    // const handleSubmit = async (e) => {
-    //     e.preventDefault();
-    //     setIsSubmitting(true);
-
-    //     if (
-    //         (isAdmin || isVolunteer || isOwner) &&
-    //         formData.donationStatus === "inProgress" &&
-    //         !selectedDonor
-    //     ) {
-    //         toast.error("Please select a donor before proceeding.");
-    //         setIsSubmitting(false);
-    //         return;
-    //     }
-
-    //     let updatedRequestData = {};
-    //     if (isOwner || isAdmin) {
-    //         updatedRequestData = {
-    //             ...formData,
-    //             donorId: selectedDonor || formData.donorId,
-    //             updatedAt: new Date().toISOString(),
-    //         };
-    //     } else if (isVolunteer) {
-    //         updatedRequestData = {
-    //             donationStatus: formData.donationStatus,
-    //             donorId: selectedDonor || formData.donorId,
-    //             updatedAt: new Date().toISOString(),
-    //         };
-    //     } else {
-    //         toast.error("You are not allowed to update this request.");
-    //         setIsSubmitting(false);
-    //         return;
-    //     }
-
-    //     try {
-    //         const idToken = await getFirebaseIdToken();
-    //         await axiosInstance.put(`/editDonationRequest/${id}`, updatedRequestData, {
-    //             headers: { Authorization: `Bearer ${idToken}` },
-    //         });
-
-    //         toast.success("Donation request updated successfully!");
-    //         navigate(isOwner ? "/dashboard/my-donation-requests" : "/dashboard/all-blood-donation-requests");
-    //     } catch (error) {
-    //         console.error(error);
-    //         toast.error("Update failed.");
-    //     } finally {
-    //         setIsSubmitting(false);
-    //     }
-    // };
-
     const handleSubmit = async (e) => {
         e.preventDefault();
         setIsSubmitting(true);
 
         if (
             (isAdmin || isVolunteer || isOwner) &&
-            formData.donationStatus === "inProgress" &&
-            !selectedDonor
+            (formData.donationStatus === "inProgress" || formData.donationStatus === "completed") &&
+            !selectedDonor &&
+            !formData.donorName
         ) {
             toast.error("Please select a donor before proceeding.");
             setIsSubmitting(false);
@@ -175,14 +129,12 @@ const EditDonationRequest = () => {
         let donorInfo = {};
         if (selectedDonor) {
             const donorUser = allUsers.find((u) => u._id === selectedDonor);
-
             if (donorUser) {
                 donorInfo = {
                     donorName: donorUser.name,
                     donorEmail: donorUser.email,
                 };
             }
-            // console.log("Selected Donor User:", donorUser.name, donorUser.email);
         }
 
         let updatedRequestData = {};
@@ -220,7 +172,6 @@ const EditDonationRequest = () => {
             setIsSubmitting(false);
         }
     };
-
 
     const handleCancel = () => {
         navigate(isAdmin || isVolunteer ? "/dashboard/all-blood-donation-requests" : "/dashboard/my-donation-requests");
