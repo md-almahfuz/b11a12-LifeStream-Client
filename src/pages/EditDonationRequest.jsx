@@ -42,7 +42,7 @@ const EditDonationRequest = () => {
 
                 const districtsJson = await districtsRes.json();
                 const upazilasJson = await upazilasRes.json();
-
+                console.log(districtsJson);
                 setDistricts(districtsJson[2]?.data || []);
                 setAllUpazilas(upazilasJson[2]?.data || []);
                 setAllUsers(usersRes.data || []);
@@ -64,7 +64,13 @@ const EditDonationRequest = () => {
                         (d) => d.name === donationRequest.recipientDistrict
                     )?.id;
 
+
                     if (selectedDistrictId) {
+                        // console.log(upazilasJson[2]?.data || [])?.filter(
+
+                        //     (u) => u.district_id === selectedDistrictId
+                        // )
+                        //console.log("Selected District ID:", selectedDistrictId);
                         setFilteredUpazilas(
                             (upazilasJson[2]?.data || []).filter(
                                 (u) => u.district_id === selectedDistrictId
@@ -83,7 +89,7 @@ const EditDonationRequest = () => {
     }, [donationRequest, loaderError, navigate]);
 
 
-    console.log("Form Data:", formData);
+    //console.log("Form Data:", formData);
 
     const handleChange = (e) => {
         const { name, value } = e.target;

@@ -106,6 +106,7 @@ const DonorDashboardHome = () => {
             }
         }
     };
+    console.log("User:", user);
 
     const handleCompleteRequest = async (requestId) => {
         const result = await Swal.fire({
