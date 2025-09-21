@@ -8,8 +8,9 @@ import axiosInstance from '../api/axiosInstance';
 import { getAuth, onAuthStateChanged } from "firebase/auth";
 import fx from 'money';
 
-// Replace with your actual Stripe publishable key
-const stripePromise = loadStripe('pk_test_51RoRRuH4iDmiBmz9aheuTZ0irnNCXCBNYAYnJcZigCoLgDTHO0f1BS9faVMVL7rFZcJyryZIEDSMJg1q5RKtjWfg00pUPGpilq');
+// Stripe publishable key
+const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY);
+
 
 const DonationForm = () => {
     const stripe = useStripe();
