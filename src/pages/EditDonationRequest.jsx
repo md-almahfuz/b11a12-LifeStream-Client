@@ -66,11 +66,6 @@ const EditDonationRequest = () => {
 
 
                     if (selectedDistrictId) {
-                        // console.log(upazilasJson[2]?.data || [])?.filter(
-
-                        //     (u) => u.district_id === selectedDistrictId
-                        // )
-                        //console.log("Selected District ID:", selectedDistrictId);
                         setFilteredUpazilas(
                             (upazilasJson[2]?.data || []).filter(
                                 (u) => u.district_id === selectedDistrictId
@@ -153,18 +148,26 @@ const EditDonationRequest = () => {
                 ...donorInfo,
                 updatedAt: new Date().toISOString(),
             };
-        } else if (isVolunteer) {
+        }
+        else if (isVolunteer) {
             updatedRequestData = {
-                donationStatus: formData.donationStatus,
-                ...donorInfo,
+                donationStatus: formData.donationStatus, // only this field
+                ...(donorInfo.donorName && donorInfo.donorEmail ? donorInfo : {}), // donor info if selected
                 updatedAt: new Date().toISOString(),
             };
+
+            // else if (isVolunteer) {
+            //     updatedRequestData = {
+            //         donationStatus: formData.donationStatus,
+            //         ...donorInfo,
+            //         updatedAt: new Date().toISOString(),
+            //     };
         } else {
             toast.error("You are not allowed to update this request.");
             setIsSubmitting(false);
             return;
         }
-        console.log("Updated Request Data:", updatedRequestData);
+        // console.log("Updated Request Data:", updatedRequestData);
 
         try {
             const idToken = await getFirebaseIdToken();

@@ -165,7 +165,7 @@ const Register = () => {
             }
             const updatedPhotoURL = photoURL.trim() === '' ? null : photoURL;
             await updateUserProfile({ displayName: name, photoURL: updatedPhotoURL });
-            console.log("User profile updated:", { displayName: name, photoURL: updatedPhotoURL });
+            //  console.log("User profile updated:", { displayName: name, photoURL: updatedPhotoURL });
 
             // Step 3: Save user data to your own backend database
             await saveUserDataToDatabase(user.uid, {

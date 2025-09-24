@@ -50,28 +50,57 @@ const Blogs = () => {
     const [selectedBlog, setSelectedBlog] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
-    const [isAuthReady, setIsAuthReady] = useState(false);
+    //const [isAuthReady, setIsAuthReady] = useState(false);
 
-    useEffect(() => {
-        // Listen for Firebase auth state changes
-        const auth = getAuth();
-        const unsubscribe = onAuthStateChanged(auth, (user) => {
-            setIsAuthReady(true);
-            if (!user) {
-                setError('You must be logged in to view blog posts.');
-                toast.error('You must be logged in to view blog posts.');
-            }
-        });
+    // useEffect(() => {
+    //     // Listen for Firebase auth state changes
+    //     const auth = getAuth();
+    //     const unsubscribe = onAuthStateChanged(auth, (user) => {
+    //         setIsAuthReady(true);
+    //         if (!user) {
+    //             setError('You must be logged in to view blog posts.');
+    //             toast.error('You must be logged in to view blog posts.');
+    //         }
+    //     });
 
-        return () => unsubscribe();
-    }, []);
+    //     return () => unsubscribe();
+    // }, []);
+
+    // useEffect(() => {
+    //     const fetchBlogs = async () => {
+    //         if (!isAuthReady) return;
+
+    //         try {
+    //             const response = await axiosInstance.get('/blogs');
+    //             if (Array.isArray(response.data) && response.data.length > 0) {
+    //                 setBlogs(response.data);
+    //             } else {
+    //                 setError('No blog posts found.');
+    //             }
+    //         } catch (err) {
+    //             console.error('Failed to fetch blogs:', err);
+    //             setError('Failed to load blog posts. Please try again later.');
+    //             if (axios.isAxiosError(err) && err.response && err.response.data && err.response.data.message) {
+    //                 toast.error(`Failed to load blogs: ${err.response.data.message}`);
+    //             } else {
+    //                 toast.error(`Failed to load blogs: ${err.message}`);
+    //             }
+    //         } finally {
+    //             setLoading(false);
+    //         }
+    //     };
+
+    //     if (isAuthReady) {
+    //         fetchBlogs();
+    //     }
+
+    // }, [isAuthReady]);
 
     useEffect(() => {
         const fetchBlogs = async () => {
-            if (!isAuthReady) return;
-
             try {
-                const response = await axiosInstance.get('/blogs');
+                // Use standard axios for public endpoint
+                const response = await axiosInstance.get('/blogs-public');
                 if (Array.isArray(response.data) && response.data.length > 0) {
                     setBlogs(response.data);
                 } else {
@@ -90,11 +119,23 @@ const Blogs = () => {
             }
         };
 
-        if (isAuthReady) {
-            fetchBlogs();
-        }
+        fetchBlogs();
+    }, []); // Empty dependency array means this runs once on mount
 
-    }, [isAuthReady]);
+    // const fetchDonationRequests = async () => {
+    //     setIsLoading(true);
+    //     setError(null);
+
+    //     try {
+    //         const response = await axiosInstance.get('/pendingRequests');
+    //         setRequests(response.data);
+    //     } catch (e) {
+    //         console.error('Failed to fetch donation requests:', e);
+    //         setError('Failed to fetch recent donation requests. Please try again.');
+    //     } finally {
+    //         setIsLoading(false);
+    //     }
+    // };
 
     const handleCardClick = (blog) => {
         setSelectedBlog(blog);

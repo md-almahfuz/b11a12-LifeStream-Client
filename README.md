@@ -123,3 +123,12 @@ Deploy:
 Every push to the main branch of your linked GitHub repository will automatically trigger a new deployment. You can also deploy manually from your terminal:
 
 vercel --prod
+
+Programming-Hero Instructors --Help
+02:45
+https://drive.google.com/drive/u/2/folders/1y7cjzDbwPtv-SdhI7QXQnPGp6OumG2Sk
+https://drive.google.com/file/d/1DIHRcIXp_EN_flwQbvBADBvTbxVrubck/view
+Programming-Hero Instructors
+02:46
+https://drive.google.com/file/d/1ZtZcb1sFUNJgjFs0V443jIJ7bMSVWM8-/view?usp=drivesdk
+https://drive.google.com/file/d/1T_MAitjfk-iA-EcRRPpPTir0YA-k7gBL/view?usp=drivesdk

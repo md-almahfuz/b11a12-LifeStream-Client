@@ -68,7 +68,7 @@ const Navbar = () => {
                             : 'text-gray-700 hover:text-blue-600 hover:bg-blue-50'
                         }`
                     }
-                    to="/blogs"
+                    to="/blogs-public"
                     onClick={closeDropdown}
                 >
                     {/* Updated icon for Blog */}

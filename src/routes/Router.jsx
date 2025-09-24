@@ -300,7 +300,7 @@ const Router = createBrowserRouter([
         ],
     },
     {
-        path: "/blogs",
+        path: "/blogs-public",
         element: <Blogs />,
     },
     {
